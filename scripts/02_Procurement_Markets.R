@@ -253,7 +253,7 @@ minLogisticsCost <- function(df,runmode){
 	} else {
 		###### Heither, 02-09-2016: Runmode!=0 - use for shipments between domestic zone and domestic port --
 		df1 <- df[Commodity_SCTG==iSCTG]
-		df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(4:12,14:30,32:45))
+		df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45))			## include inland water - 03-06-2017
 		if(nrow(df2)>0) {if(pass==0) {
 			df_out <- copy(df2)
 			pass <- pass + 1
