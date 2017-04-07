@@ -8,7 +8,8 @@
 ############################################################################################## 
 
 #1.Set the base directory (the directory in which the model resides)
-basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
+#basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
+basedir <- getwd()
 
 #2. Set the scnario to run -- same as the folder name inside the scenarios directory
 scenario <- "base"

@@ -44,6 +44,10 @@ source("./scripts/0_File_Locations.R")
 progressManager("Start",model$logs$Step_RunTimes, model$scenvars$outputlog, model$logs$Main_Log, 
                 model$scenvars$outputprofile, model$logs$Profile_Log, model$logs$Profile_Summary)
 
+# split this out to run steps seperately more easily
+# functionalize the step 3 stuff to allow just certain markets to ru
+# change 03_PMG_Controller.R to using parallel insteadn of 
+
 lapply(model$stepscripts,source)
 
 save(list=c("model",model$steps),file=file.path(model$outputdir,"modellists.Rdata"))

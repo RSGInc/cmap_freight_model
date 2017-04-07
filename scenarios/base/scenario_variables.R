@@ -99,16 +99,21 @@ HighVariability     <- 0.09
 maxcostrscripts <- 8
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
-maxrscriptinstances <- 32
+#maxrscriptinstances <- 32
+maxrscriptinstances <- 8
 
 # should monitoring be run?
 pmgmonitoring <- TRUE
 
 #monitoring settings
-pmgmonfrom <- "cheither@cmap.illinois.gov"
-pmgmonto <- c("cheither@cmap.illinois.gov","lcruise@cmap.illinois.gov")
-pmgmonsmtp <- "outlook.office365.com"
-pmgmoninterval <- 43200
+# pmgmonfrom <- "cheither@cmap.illinois.gov"
+# pmgmonto <- c("cheither@cmap.illinois.gov","lcruise@cmap.illinois.gov")
+# pmgmonsmtp <- "outlook.office365.com"
+# pmgmoninterval <- 43200
+pmgmonfrom <- "colin.smith@rsginc.com"
+pmgmonto <- "colin.smith@rsginc.com"
+pmgmonsmtp <- "WRJHUBVPW01.i-rsg.com"
+pmgmoninterval <- 14400
 
 # should pmg logging be on? (see also verbose below for level of detail)
 pmglogging <- TRUE
