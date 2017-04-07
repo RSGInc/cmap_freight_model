@@ -1,5 +1,5 @@
 /* STEP2_CREATE_MODEPATH_SKIM_FILE.SAS
-      Craig Heither, revised 04-15-2016
+      Craig Heither, revised 03-14-2017
 
 	This program creates the following files used in the Meso Freight Model:
 		- "data_modepath_skims.csv": provides the cost/time attributes for each of the 54 modepath options between each pair of zones.
@@ -9,37 +9,49 @@
 									(truck/rail) used between Domestic zone and port. 
 								
 
-
 	This version includes a host of modal improvements to support the new Meso model requirements:
-		- Indirect truck modes (32 [FTL] & 39 [LTL}) are created for shipments between non-CMAP U.S. (except Hawaii)/Canada/Mexico.
+		- Indirect truck modes (32 [FTL] & 39 [LTL}) are created for shipments between non-CMAP U.S. zones (except Hawaii)/Canada/Mexico.
 		- Inland waterway mode (1) is created for appropriate non-CMAP shipments.
 		- Air mode (47) is created for shipments between non-CMAP locations.
 		- International shipping mode is created between all continental U.S. mesozones and Alaska/Hawaii/all foreign countries (see more below).
 		
+	revised 03-14-2017:	
 	International shipping mode is created as follows:
-		- A list of the top 30 continental U.S. ports (by total import/export tonnage from 2007 FAF) is used as the universe of domestic ports.
+		- A list of the top 30 U.S. port Mesozones (based on total 2013 import/export tonnage from the Waterborne Commerce Statistics Center [http://www.navigationdatacenter.us/wcsc/porttons13.html])
+			is used as the universe of domestic ports. Note: a Mesozone may contain multiple port facilities (for instance, the ports of Long Beach and Los Angeles are both in zone 159).
 		- The domestic ports (with Ocean) are attached to each zone pair.  If the domestic port ocean differs from the destination port ocean, extra distance is added
 			to account for using the Panama Canal:
 				- assign Panama as intermediate destination for GCD (domestic port to Panama)
 				- assign Panama as intermediate destination for GCD (Panama to destination port)
 				- sum total distance
-		- Determine "Best" domestic port to use for each destination:
-				- assume it minimizes total generalized cost (cost + time)
-				- total time is comprised of:
-					- drayage at each end
-					- hauling the shipment from the origin to the domestic port
-						- if rail is available: this time is the average of rail and truck transport times
-						- otherwise just truck time is used
-				- total cost is comprised of:
-					- cost per mile on the cargo ship (ignores transloading fee)
-					- cost per mile of drayage at each end
-					- cost per mile of hauling the shipment from the origin to the domestic port
-						- if rail is available: this cost is the average of rail and truck transport costs
-						- otherwise just truck cost is used
-				- final generalized cost is 0.4*shipping time + 0.6*shipping cost
-				
+		- Determine "Best" domestic port to use for each domestic location for Bulk commodities and for non-Bulk commodities:
+			- assume it minimizes total generalized cost (cost + time)
+			- Bulk Commodities
+				- time = time to transport via international shipping between domestic port and foreign location +
+						 time to transport between port and domestic location (using either rail or inland waterway or the average of both if available [truck time is used if these modes are not available]) +
+						 drayage time at both ends	
+						 (no transloading is assumed)
+				- cost = cost to transport via international shipping between domestic port and foreign location +
+						 cost to transport between port and domestic location (using either rail or inland waterway or the average of both if available [truck cost is used if these modes are not available]) +
+						 drayage cost both ends	
+						 (no transloading fee is assumed)
+				- Generalized Cost = 0.4*shipping time + 0.6*shipping cost * (1 + random variation (ranging between -7.5% and +7.5%))
+			- non-Bulk Commodities
+				- time = time to transport via international shipping between domestic port and foreign location +
+						 time to transport between port and domestic location using truck +
+						 drayage time at both ends	
+						 (no transloading is assumed)
+				- cost = cost to transport via international shipping between domestic port and foreign location +
+						 cost to transport between port and domestic location using truck +
+						 drayage cost both ends	
+						 (no transloading fee is assumed)
+				- Generalized Cost = 0.6*shipping time + 0.4*shipping cost * (1 + random variation (ranging between -7.5% and +7.5%))			
+			- The top 5 port options are selected for each zone pair for both Bulk and non-Bulk items (based on the lowest generalized cost)		
+			- For each zone pair, the "best" port for Bulk and non-Bulk items are randomly selected independently using the total port tonnage as a probability value
 				
 	See VERIFY_COSTS_TIMES.SAS for modepath options available to zonal interchanges.
+	
+	01-09-2017 revision: corrected mileage value for indirect truck modes 32 & 39, modified minpath 4,14 calculations, adjustment for connector-only paths 
 	
 */
 *################################################################################################;  
@@ -56,7 +68,7 @@ libname	p 'SASLIB';
 %let maxskim=34;  				                           	    *** -- Maximum skim matrix to be read in -- ***;
 filename CCdist "&emdir.CCdist.txt";                            *** -- Highway centroid connector length -- ***;
 
-filename dports "inputs\domestic_ports.csv";                    *** -- Top 30 US ports for international shipping (based on 2013 tonnage) -- ***;
+filename dports "inputs\domestic_ports.csv";                    *** -- Top 30 US ports for international shipping (based on 2013 tonnage, including total foreign tonnage [imports+exports]) -- ***;
 filename fports "inputs\foreign_ports.csv";                     *** -- Ocean used for each foreign port for international shipping -- ***;
 
 filename gcd "outputs\&sysparm.\data_mesozone_gcd.csv";         *** -- New output file of Great Circle Distances created by CREATE_GCD_FILE.SAS -- ***;
@@ -197,10 +209,12 @@ filename ports "outputs\&sysparm.\data_modepath_ports.csv";     *** -- New outpu
 %mend ReadSkims;
 %ReadSkims
 /* end of macro */
-**------------------------------------------------------------------------** 
-%let i=1; %let j=2;
+**------------------------------------------------------------------------**; 
+run; 
+
+%let i=1; %let j=2; %let LOS=ivtt; %let LOS2=tt;
 %macro FixIvtt;
-   %do %while (&i le 4);  **25;
+   %do %while (&i le 25);  
 
       *** -- Each set of skim matrices represents a specific rail carrier or mode -- ***;
 	  %if &i=1 %then %let OP=B;
@@ -212,16 +226,21 @@ filename ports "outputs\&sysparm.\data_modepath_ports.csv";     *** -- New outpu
 	  %if &i=25 %then %let OP=K;
 	  
 	  data mf&i; merge mf&i mf&j; by o dest;
-	    if &OPivtt=. then output; proc print;
+	    /* if &OP&LOS=. then output; proc print; title "No In-Vehicle Time (all connector)"; */
+		*** Double total travel, set in-vehicle at 80%;
+		if &OP&LOS=. then do; &OP&LOS2=&OP&LOS2*2; &OP&LOS=&OP&LOS2*0.8;
+		end;  
+		
      run;
 	 
 	 %let i=%eval(&i+4);
+	 %let j=%eval(&j+4);
    %end;
   run;
 %mend FixIvtt;
 %FixIvtt
 /* end of macro */
-**------------------------------------------------------------------------** 
+**------------------------------------------------------------------------**; 
 run;
 
 data skims; merge mf1-mf2 mf5-mf6 mf9-mf10 mf13-mf14 mf17-mf18 mf21-mf22 mf25-mf26 mf31-mf34; by o dest;
@@ -243,7 +262,6 @@ data skims; set skims;
   if Wtt=0 then WAvail=0; else WAvail=1;
   if o<dest then output;   *** -- second direction and intrazonals will be added later -- ***;  
   
-  data check; set skims(where=(o=151 & dest=153));  proc print; title "Check indirect rail";
   **------------------------------------------------------------------------** 
       -- Subset skims into different groups --  
   **------------------------------------------------------------------------** ;
@@ -372,7 +390,7 @@ data i10; set temp; by od;
   IntDray{LogNode} = ILNTtt;
   LineHaul{LogNode} = LHMiles;
   RlCarr{LogNode} = Carr;    ** -- rail carrier mode for indirect shipments -- **;
-  if dest<=&LEZ then ExtDray=DestCCmi; else ExtDray=&ExtDrayFor;	*** -- ExtDray distance is fixed, use fixed esitmate for foreign  zones -- ***;
+  if dest<=&LEZ then ExtDray=DestCCmi; else ExtDray=&ExtDrayFor;	*** -- ExtDray distance is fixed, use fixed estimate for foreign  zones -- ***;
   if Last.OD then output;
   keep o dest od IntDray&FLN--LineHaul&LLN ExtDray Carr&FRT-Carr&LRT;
    proc sort; by o dest; 
@@ -500,6 +518,7 @@ data ncmapair(drop=GCD IntDray); merge ncmapair part1(in=hit); by o dest; if hit
     **** -- IntDray141 & LineHaul141 to represent air travel between these zones: between external zone pairs -- ****;	
     **** -- this is general air cargo, not cargo using OHare.                                                 -- ****;	
 	IntDray141=IntDray; LineHaul141=GCD; 
+	if o=dest then IntDray141=IntDray/2;				***-- Heither, 01-04-2017: scaled back drayage for intrazonal since already using estimate for linehaul -- ***;   
 	
 data allair; set cmapair ncmapair;
   ******* ==== USE EMME DATA FOR EXTDRAY WHEN AVAILABLE ==== *******;
@@ -511,7 +530,6 @@ data allair; set cmapair ncmapair;
 data i; update i allair; by o dest; 
     **** -- Airport linehaul now reflects GCD -- ****;	 
 	
-  
   **------------------------------------------------------------------------** 
       -- Create international water skims for all zone pairs --  
   **------------------------------------------------------------------------** ; 
@@ -596,12 +614,29 @@ data intship3; merge intship3(in=hit) shipgcd; by Production_zone Consumption_zo
   proc sort; by o dest Port_mesozone Pan_flag;
  
   ******* ==== collapse two-part ship distances into a single summed value ==== *******;
-proc summary nway data=intship3; var GCD; class o dest Port_mesozone Pan_flag; id Location Port_name; output out=intship4 sum=;  
+proc summary nway data=intship3; var GCD; class o dest Port_mesozone Pan_flag; id Location Port_name FrgnTons; output out=intship4 sum=;  
   proc sort data=intship4; by o dest Port_mesozone GCD;
 data intship4; set intship4; by o dest Port_mesozone;
   if first.Port_mesozone;      *** -- eliminate unnecessary second ocean calculation for ports connecting to Canada/Mexico -- ***;  
-   
-  ******* ==== PART 2. Attach Truck/Rail LH between Origin and Port ==== *******;
+
+  ******* ==== PART 2a. Attach Inland Waterway LH between Origin and Port ==== *******;
+  ** -- Create inland waterway skim data for non-CMAP U.S. mesozones -- **;
+data inwtr1(rename=(Wtt=Wtrway dest=Port_mesozone)); set mf32(where=(o>=&FEZ & dest>=&FEZ));  
+  proc sort; by o Port_mesozone;
+
+  ** -- Create inland waterway skim data for CMAP U.S. mesozones -- **;
+data inwtr2(keep=o Port_mesozone Wtrway); set i(where=(o<=&LIZ));  
+ array LineHaul[&FWT:&LWT] LineHaul&FWT-LineHaul&LWT;
+  Wtrway=9999; 
+  do i=&FWT to &LWT;
+	Wtrway=min(Wtrway,LineHaul[i]);
+  end;	
+  if 0<Wtrway<9999;
+  rename dest=Port_mesozone;
+  proc sort; by o Port_mesozone;
+  
+  
+  ******* ==== PART 2b. Attach Truck/Rail LH between Origin and Port ==== *******;
   ******* ==== then add Internal & External drayage ==== *******; 
 data toport(rename=(dest=Port_mesozone Tdist00=Tdist Rdist00=Rdist)); set i(where=(o<=&LEZ & (dest<=&LEZ or dest in (310,399))));
   keep o dest Tdist00 Rdist00;
@@ -619,7 +654,7 @@ data toport(drop=c); set toport;
    proc sort nodupkey; by o Port_mesozone; 
       
 proc sort data=intship4; by o Port_mesozone;  
-data intship4(drop=_type_ _freq_); merge intship4(in=hit) toport hawaii; by o Port_mesozone; if hit;
+data intship4(drop=_type_ _freq_); merge intship4(in=hit) toport hawaii inwtr1 inwtr2; by o Port_mesozone; if hit;
   if Tdist=. & DrayFix>0 then Tdist=DrayFix;        *** -- set Linehaul value between Hawaiian zones -- ***;
   
     ** -- attach internal drayage, add external drayage -- **;
@@ -632,39 +667,56 @@ data intship4; merge intship4(in=hit) intdr; by o; if hit;
 
   ******* ==== PART 3. Determine 'Best' Domestic Port to Use ==== *******;
   ******* ==== for simplicity, start by assuming it is the one that minimizes overall travel time ==== *******;	  
-  ******* ==== overall travel time: time on ship (port to dest) plus truck time(o to port + drayage at each end) ==== *******;	  
+  ******* ==== overall travel time: time on ship (port to dest) plus mean(truck,rail,inland water) time(o to port + drayage at each end) ==== *******;	  
 data intship4(drop=temp); set intship4;	
-  if Rdist>0 then haul_toPort=(Tdist/&LHTruckMPH)*0.5 + (Rdist/&RailMPH)*0.5;
-  else haul_toPort=Tdist/&LHTruckMPH;
-  MinShipTime=GCD/&WaterMPH + haul_toPort + (InDray+ExDray)/&DrayTruckMPH;  
-  
-    ** -- Cost: assume no transloading -- **; 
-  if Rdist>0 then cost_toPort=(Tdist*&FTL53rate)*0.5 + (Rdist*&IMXRate)*0.5;
-  else cost_toPort=Tdist*&FTL53rate;	
-  MinShipCost=(InDray+ExDray)*&FTL53rate + cost_toPort + GCD*&WaterRate;  *** -- ignore transload handling fee -- ***;	
-  MinShipTime=(0.4*MinShipTime) + (0.6*MinShipCost);	
-  if MinShipTime=. then delete;
-  output;
-  temp=o; o=dest; dest=temp; output;
-  proc sort; by o dest MinShipTime;
-  
-data intship4; set intship4; by o dest MinShipTime;	  
-  retain ord 0;
-   ord+1;
-   if first.dest then ord=1;
-     
-data intship4; set intship4(where=(ord<=5));    *** -- limit to top 5 ports -- ***; 
-  proc summary nway; var ord; class o dest; output out=x max=maxord;     
-data x(drop=_type_ _freq_); set x; choice=ranuni(&seed);
+  **## Non-Bulk Commodities (truck only) ##**;
+   haul_toPortNB=Tdist/&LHTruckMPH;
+   MinShipTimeNB=GCD/&WaterMPH + haul_toPortNB + (InDray+ExDray)/&DrayTruckMPH; 
+   cost_toPortNB=Tdist*&FTL53rate; ** -- Cost: assume no transloading -- **;
+   MinShipCostNB=(InDray+ExDray)*&FTL53rate + cost_toPortNB + GCD*&WaterRate;  *** -- ignore transload handling fee -- ***;	
+   adjNB=ranuni(&seed)*0.15-0.075;  *** -- random cost variance between -0.075 & 0.075 -- ***;	
+   GenCostNB=((0.6*MinShipTimeNB) + (0.4*MinShipCostNB))*(1+adjNB);	*** -- assume non-bulk items value time more than cost -- ***;	
+  **## Bulk Commodities (mean of rail & inland water) ##**;  
+   haul_toPortB=mean(Rdist/&RailMPH,Wtrway/&WaterMPH);  
+   MinShipTimeB=GCD/&WaterMPH + haul_toPortB + (InDray+ExDray)/&DrayTruckMPH;  
+   cost_toPortB=mean(Rdist*&CarloadRate,Wtrway*&WaterRate2);  ** -- Cost: assume no transloading -- **;
+   MinShipCostB=(InDray+ExDray)*&FTL53rate + cost_toPortB + GCD*&WaterRate;  *** -- ignore transload handling fee -- ***;
+   adjB=ranuni(&seed)*0.15-0.075;  *** -- random cost variance between -0.075 & 0.075 -- ***;	   
+   GenCostB=((0.4*MinShipTimeB) + (0.6*MinShipCostB))*(1+adjB);  *** -- assume bulk items value cost more than time -- ***; 
+   output;
+   temp=o; o=dest; dest=temp; output;
+    proc sort; by o dest GenCostNB;
    
-data intship4; merge intship4 x; by o dest; 
-  prob=ord*(1/maxord);	  
-  if prob>choice;                       *** -- keep viable choices for movements -- ***;
-  proc sort; by o dest ord;
+data nonbulk(drop=haul_toPortB MinShipTimeB cost_toPortB MinShipCostB GenCostB); set intship4(where=(GenCostNB is not null)); by o dest GenCostNB;	  
+  retain ord 0; ord+1; if first.dest then ord=1;
+data nonbulk; set nonbulk(where=(ord<=5));    *** -- limit to top 5 ports -- ***; 
+  proc sort; by o dest port_mesozone;  
   
-data intship4(drop=ord prob maxord choice); set intship4; by o dest ord;		
-  if first.dest;	
+  ** Select best choice based on probability **;
+proc surveyselect noprint data=nonbulk method=pps seed=1842 n=1 out=test1; size FrgnTons; strata o dest; ** pps=selection with probability proportional to size and without replacement;
+data test1(keep=o dest Port_mesozone Port_name); set test1; proc sort; by o dest Port_mesozone;
  
+proc sort data=intship4; by o dest GenCostB;
+data bulk(drop=haul_toPortNB MinShipTimeNB cost_toPortNB MinShipCostNB GenCostNB); set intship4(where=(GenCostB is not null)); by o dest GenCostB;	  
+  retain ord 0; ord+1; if first.dest then ord=1;
+data bulk; set bulk(where=(ord<=5));    *** -- limit to top 5 ports -- ***; 
+  proc sort; by o dest port_mesozone;  
+    
+  ** Select best choice based on probability **;
+proc surveyselect noprint data=bulk method=pps seed=1842 n=1 out=test2; size FrgnTons; strata o dest; ** pps=selection with probability proportional to size and without replacement;
+data test2(keep=o dest Port_mesozoneB Port_NameB); set test2; 
+  rename Port_mesozone=Port_mesozoneB Port_Name=Port_NameB;
+  proc sort; by o dest;
+
+proc sort data=intship4; by o dest Port_mesozone;
+data intship4; merge intship4 test1(in=hit); by o dest Port_mesozone; if hit;
+  rename Port_mesozone=Port_mesozoneNB Port_Name=Port_NameNB;
+  drop haul_toPortNB MinShipTimeNB cost_toPortNB MinShipCostNB haul_toPortB MinShipTimeB cost_toPortB MinShipCostB adjNB adjB;
+    
+data intship4; merge intship4(in=hit) test2; by o dest; if hit; 
+  if Port_mesozoneB=. then do; Port_mesozoneB=Port_mesozoneNB; Port_NameB=Port_NameNB; end;
+
+
   ******* ==== #### Final Combined Data: EMME AND AIR AND INTL WATER #### ==== *******;  
 data i; merge i(in=hit) intship4; by o dest; if hit;
   if o>&LEZ & dest>&LEZ then delete;    *** -- ensure no foreign-to-foreign movements -- ***;
@@ -672,15 +724,16 @@ data i; merge i(in=hit) intship4; by o dest; if hit;
 
   **------------------------------------------------------------------------** 
       -- Create intrazonal skim data for U.S. mesozones --  
-  **------------------------------------------------------------------------** ; 
+  **------------------------------------------------------------------------** ;  
 data intdr; set intdr(where=(o<&FLN or o>&LLN));
-  dest=o; Tdist00=InDray;
-  InDray=InDray/2; ExtDray=InDray;   ***-- assume no intrazonal rail movements within CMAP --***;
+  dest=o; Tdist00=InDray;					***-- assume no intrazonal rail movements within CMAP --***;
+  IntraDray=InDray/2; 						***-- Heither, 01-04-2017: scaled back drayage for intrazonal since already using estimate for linehaul -- ***;   
   if o>&LIZ then do;
-    RAvail00=1; Rdist00=Tdist00*1.25;     ***-- assume all non-CMAP U.S. mesozones have rail access --***;
+    RAvail00=1; 
+	if Rdist00=. then Rdist00=Tdist00*1.25;     	***-- assume all non-CMAP U.S. mesozones have rail access --***;
   end;
 
-  
+
   **------------------------------------------------------------------------** 
       -- Create inland waterway skim data for non-CMAP U.S. mesozones --  
   **------------------------------------------------------------------------** ; 
@@ -692,18 +745,13 @@ data inland(rename=(Wtt=Waterway)); set mf32(where=(o>=&FEZ & dest>=&FEZ));
     -- COMBINE ALL SKIMS AND CREATE TRANSPORT AND LOGISTICS PATHS --
 *###=================================================================================###;	 
 data i; merge i intdr; by o dest;
+  proc sort; by o dest Tdist00;
+  
+data i; set i; by o dest Tdist00; if last.dest;
 
 data i(drop=EmDist); merge i(in=hit) emskim inland; by o dest; if hit;
   if TDist00=. & EmDist>0 then TDist00=EmDist;
 
-/* *****  
-data check; set i(where=(ExtDray/Tdist00>0.75));
-   proc print; title "Tdist-ExtDray check"; 
- 
-data check; set i(where=(ExtDray/Rdist00>0.75));
-   proc print; title "Rdist-ExtDray check";   
-*** */
-  
 proc sort data=i; by dest;  
 data i; merge i(in=hit) railwater_gcd; by dest; if hit;   
   proc sort; by o dest; 
@@ -742,9 +790,16 @@ Note: Cost/time of water-based ocean shipping is not included.
     else do;   *** --- non-CMAP U.S. origin: calculate only 1 airport option --- ***;
        do i=&FAT to &FAT;
         **-- Cost of shipping by air per ton --**;
-         cA[i] = &LTL53rate*(IntDray[i]+ExtDray) + LineHaul[i]*&AirRate + 2*&AirHandFee;
-         tA[i] = (IntDray[i]+ExtDray)/&DrayTruckMPH + LineHaul[i]/&AirMPH + 2*&AirTime;   
-		 mlA[i] = (IntDray[i]+ExtDray) + LineHaul[i];
+		 if o=dest then do;
+            cA[i] = &LTL53rate*(IntDray[i]) + LineHaul[i]*&AirRate + 2*&AirHandFee;
+            tA[i] = (IntDray[i])/&DrayTruckMPH + LineHaul[i]/&AirMPH + 2*&AirTime;   
+		    mlA[i] = IntDray[i] + LineHaul[i];
+         end;	
+    	 else do;
+            cA[i] = &LTL53rate*(IntDray[i]+ExtDray) + LineHaul[i]*&AirRate + 2*&AirHandFee;
+            tA[i] = (IntDray[i]+ExtDray)/&DrayTruckMPH + LineHaul[i]/&AirMPH + 2*&AirTime;   
+		    mlA[i] = (IntDray[i]+ExtDray) + LineHaul[i];
+         end;			 
        end;
 	end;
   end;   
@@ -776,14 +831,15 @@ Note: Cost/time of water-based ocean shipping is not included.
    * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --;  
    *### -- 0 Stops -- ###*;
    **** Apply the direct/express surcharge where appropriate ****;
-  tCarload = Rdist00/&RailMPH ; 
-  cCarload = &ExpressSurcharge*Rdist00*&CarloadRate ;
-  tIMX = Rdist00/&RailMPH ; 
-  cIMX = &ExpressSurcharge*Rdist00*&IMXRate ; 
-  tFTL = Tdist00/&LHTruckMPH ; 
-  cFTL = &ExpressSurcharge*Tdist00*&FTL53rate ;
-  tLTL = Tdist00/&LHTruckMPH ; 
-  cLTL = &ExpressSurcharge*Tdist00*&LTL53rate ;
+  tCarload = Rdist00/&RailMPH ; 										*** -- time: minpath 3 -- ***;
+  cCarload = &ExpressSurcharge*Rdist00*&CarloadRate ;					*** -- cost: minpath 3 -- ***;
+  tIMX = Rdist00/&RailMPH ; 											*** -- time: minpath 13 -- ***;
+  cIMX = &ExpressSurcharge*Rdist00*&IMXRate ; 							*** -- cost: minpath 13 -- ***;
+  tFTL = Tdist00/&LHTruckMPH ; 											*** -- time: minpath 31 -- ***;
+  cFTL = &ExpressSurcharge*Tdist00*&FTL53rate ;							*** -- cost: minpath 31 -- ***;
+  tLTL = Tdist00/&LHTruckMPH ; 											*** -- time: minpath 46 -- ***;
+  cLTL = &ExpressSurcharge*Tdist00*&LTL53rate ;							*** -- cost: minpath 46 -- ***;
+  mlT31 = Tdist00;              										*** -- mileage for minpath 31,46 -- ***;
 
    *### -- 1 Stop  (assume stops only happen with mode switching) -- ###*;
     ***-- 1 external stop, 0 internal stops --*** ;
@@ -799,17 +855,35 @@ Note: Cost/time of water-based ocean shipping is not included.
    c1Li0 = ExtDray*&LTL53rate + (Rdist00-ExtDray)*&IMXRate + 1*&WDCHandFee ; 
    c1Lf0 = ExtDray*&LTL53rate + (Tdist00-ExtDray)*&FTL53rate + 1*&WDCHandFee ; 
    c1LL0 = ExtDray*&LTL53rate + (Tdist00-ExtDray)*&LTL53rate + 1*&WDCHandFee ;  */
-
-   t1fc0 = ExtDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&BulkTime; 		*** -- time: minpath 4 -- ***;
-   t1fi0 = ExtDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&BulkTime ; 	*** -- time: minpath 14 -- ***;
-   t1Li0 = ExtDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&WDCTime ; 
-   t1Lf0 = ExtDray/&DrayTruckMPH + Tdist00/&LHTruckMPH + 1*&WDCTime ; 
-   t1LL0 = ExtDray/&DrayTruckMPH + Tdist00/&LHTruckMPH + 1*&WDCTime ; 
-   c1fc0 = ExtDray*&FTL53rate + Rdist00*&CarloadRate + 1*&BulkHandFee ; *** -- cost: minpath 4 -- ***;
-   c1fi0 = ExtDray*&FTL53rate + Rdist00*&IMXRate + 1*&BulkHandFee ; 	*** -- cost: minpath 14 -- ***;
-   c1Li0 = ExtDray*&LTL53rate + Rdist00*&IMXRate + 1*&WDCHandFee ; 
-   c1Lf0 = ExtDray*&LTL53rate + Tdist00*&FTL53rate + 1*&WDCHandFee ; 
-   c1LL0 = ExtDray*&LTL53rate + Tdist00*&LTL53rate + 1*&WDCHandFee ;   
+  
+   if o=dest then do;
+     ** Intrazonal **;
+      t1fc0 = IntraDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&BulkTime; 			*** -- time: minpath 4 -- ***; *** Heither, 01-04-2017: added IntraDray ***;
+      t1fi0 = IntraDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&IMXTime ;		 		*** -- time: minpath 14 -- ***; *** Heither, 01-04-2017: changed BulkTime to IMXTime, added IntraDray ***;
+      t1Li0 = IntraDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&WDCTime ; 
+      t1Lf0 = IntraDray/&DrayTruckMPH + Tdist00/&LHTruckMPH + 1*&WDCTime ; 
+      t1LL0 = IntraDray/&DrayTruckMPH + Tdist00/&LHTruckMPH + 1*&WDCTime ; 
+      c1fc0 = IntraDray*&FTL53rate + Rdist00*&CarloadRate + 1*&BulkHandFee ; 		*** -- cost: minpath 4 -- ***; *** Heither, 01-04-2017: added IntraDray ***;
+      c1fi0 = IntraDray*&FTL53rate + Rdist00*&IMXRate + 1*&IMXHandFee ; 			*** -- cost: minpath 14 -- ***; *** Heither, 01-04-2017: changed BulkHandFee to IMXHandFee, added IntraDray ***;
+      c1Li0 = IntraDray*&LTL53rate + Rdist00*&IMXRate + 1*&WDCHandFee ; 
+      c1Lf0 = IntraDray*&LTL53rate + Tdist00*&FTL53rate + 1*&WDCHandFee ; 
+      c1LL0 = IntraDray*&LTL53rate + Tdist00*&LTL53rate + 1*&WDCHandFee ;  
+	  mlR4 = IntraDray + Rdist00;              										*** -- mileage for minpath 4,14 -- ***;		  
+   end;
+   else do;
+      t1fc0 = ExtDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&BulkTime; 				*** -- time: minpath 4 -- ***;
+      t1fi0 = ExtDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&IMXTime ; 				*** -- time: minpath 14 -- ***; *** Heither, 01-03-2017: changed BulkTime to IMXTime ***;
+      t1Li0 = ExtDray/&DrayTruckMPH + Rdist00/&RailMPH + 1*&WDCTime ; 
+      t1Lf0 = ExtDray/&DrayTruckMPH + Tdist00/&LHTruckMPH + 1*&WDCTime ; 
+      t1LL0 = ExtDray/&DrayTruckMPH + Tdist00/&LHTruckMPH + 1*&WDCTime ; 
+      c1fc0 = ExtDray*&FTL53rate + Rdist00*&CarloadRate + 1*&BulkHandFee ; 			*** -- cost: minpath 4 -- ***; 
+      c1fi0 = ExtDray*&FTL53rate + Rdist00*&IMXRate + 1*&IMXHandFee ; 				*** -- cost: minpath 14 -- ***; *** Heither, 01-04-2017: changed BulkHandFee to IMXHandFee ***;
+      c1Li0 = ExtDray*&LTL53rate + Rdist00*&IMXRate + 1*&WDCHandFee ; 
+      c1Lf0 = ExtDray*&LTL53rate + Tdist00*&FTL53rate + 1*&WDCHandFee ; 
+      c1LL0 = ExtDray*&LTL53rate + Tdist00*&LTL53rate + 1*&WDCHandFee ;   
+	  mlR4 = ExtDray+Rdist00;           											*** -- mileage for minpath 4,14 -- ***;			  
+   end;
+   
 
    *### -- 0/1 external stops, 1 internal stop -- ###*;
    array t0cf[&FRT:&LRT] t0cf&FRT-t0cf&LRT;
@@ -847,7 +921,7 @@ Note: Cost/time of water-based ocean shipping is not included.
      c1fif[i]=(LineHaul[i]*&IMXRate) + (ExtDray+IntDray[i])*&FTL53rate + 2*&WDCHandFee;         *** -- cost: minpath 23-26 -- ***;
      c1LiL[i]=(LineHaul[i]*&IMXRate) + (ExtDray+IntDray[i])*&LTL53rate + 2*&WDCHandFee;         *** -- cost: minpath 27-30 -- ***;
 	 mlR[i] = LineHaul[i] + ExtDray + IntDray[i];    
-	 mlR3 = Rdist00;              *** -- mileage for minpath 3,4,13,14 -- ***;
+	 mlR3 = Rdist00;              																*** -- mileage for minpath 3,13 -- ***;
    end;   
    
    do i=&FTT to &LTT;
@@ -861,27 +935,38 @@ Note: Cost/time of water-based ocean shipping is not included.
 	 mlT31 = Tdist00;              *** -- mileage for minpath 31,46 -- ***;
    end;
    
-   *### -- CREATE INDIRECT FTL AND LTL TRUCK COSTS/TIMES FOR U.S. SHIPMENTS NOT INVOLVING CMAP (OTHERWISE TRUCK IS NOT AN OPTION FOR THESE INDIRECT SHIPMENTS) -- ###*;   
+   *### -- CREATE INDIRECT FTL [32] AND LTL [39] TRUCK COSTS/TIMES FOR U.S. SHIPMENTS NOT INVOLVING CMAP (OTHERWISE TRUCK IS NOT AN OPTION FOR THESE INDIRECT SHIPMENTS) -- ###*;   
    if (&FEZ<=o<=&LEZ or o in (310,399)) & (&FEZ<=dest<=&LEZ or dest in (310,399)) then do;
       if Tdist00=. then d=GCD; else d=TDist00;																*** -- set indirect truck LH distance -- ***;
-      c0FL133=(ExtDray*2+d)*&FTL53rate + 1*&WDCHandFee;  													*** -- FTL indirect cost -- ***;
-	  t0FL133=d/&LHTruckMPH + (ExtDray*2)/&DrayTruckMPH + 1*&WDCTime; 										*** -- FTL indirect time -- ***;
-	  c1LFL133=d*&FTL53rate + (ExtDray*2)*&LTL53rate + 2*&WDCHandFee;										*** -- LTL indirect cost -- ***;
-	  t1LFL133=d/&LHTruckMPH + (ExtDray*2)/&DrayTruckMPH + 1*&WDCTime;										*** -- LTL indirect time -- ***;
+	  if o=dest then do;
+	    ** Intrazonal **;
+         c0FL133=(IntraDray+d)*&FTL53rate + 1*&WDCHandFee;  												*** -- FTL indirect cost, Heither, 01-04-2017: added IntraDray-- ***;
+	     t0FL133=d/&LHTruckMPH + IntraDray/&DrayTruckMPH + 1*&WDCTime; 										*** -- FTL indirect time, Heither, 01-04-2017: added IntraDray -- ***;
+	     c1LFL133=d*&FTL53rate + IntraDray*&LTL53rate + 2*&WDCHandFee;										*** -- LTL indirect cost, Heither, 01-04-2017: added IntraDray -- ***;
+	     t1LFL133=d/&LHTruckMPH + IntraDray/&DrayTruckMPH + 1*&WDCTime;										*** -- LTL indirect time, Heither, 01-04-2017: added IntraDray -- ***;
+		 mlT133 = IntraDray+d;        																		*** -- mileage for minpath 32,39 -- ***;
+	  end;
+	  else do;
+         c0FL133=(ExtDray+d)*&FTL53rate + 1*&WDCHandFee;  													*** -- FTL indirect cost -- ***;
+	     t0FL133=d/&LHTruckMPH + ExtDray/&DrayTruckMPH + 1*&WDCTime; 										*** -- FTL indirect time -- ***;
+	     c1LFL133=d*&FTL53rate + ExtDray*&LTL53rate + 2*&WDCHandFee;										*** -- LTL indirect cost -- ***;
+	     t1LFL133=d/&LHTruckMPH + ExtDray/&DrayTruckMPH + 1*&WDCTime;										*** -- LTL indirect time -- ***;
+		 mlT133 = ExtDray+d;        																		*** -- mileage for minpath 32,39 -- ***;	  
+	  end;
+
 	  if (o in (179,180) & dest not in (179,180)) or (o not in (179,180) & dest in (179,180)) then do;
 	     c0FL133=.; t0FL133=.; c1LFL133=.; t1LFL133=.;														*** -- Do Not Allow for Hawaii to non-Hawaii shipments -- ***;
 	  end;
-	  mlT31 = ExtDray*2+d;        *** -- mileage for minpath 31,46 -- ***;
 	  
-   *### -- CREATE DIRECT FTL AND LTL TRUCK COSTS/TIMES SHIPMENTS BETWEEN TWO HAWAIIAN ZONES (OTHERWISE TRUCK IS NOT AN OPTION FOR THESE DIRECT SHIPMENTS) -- ###*;   	  
-   if (o=179 & dest=180) or (o=180 & dest=179) then do;	  
-      tFTL = GCD/&LHTruckMPH ; 
-      cFTL = &ExpressSurcharge*GCD*&FTL53rate ;
-      tLTL = GCD/&LHTruckMPH ; 
-      cLTL = &ExpressSurcharge*GCD*&LTL53rate ;
-	  mlT31 = GCD;                *** -- mileage for minpath 31,46 -- ***;
+     *### -- CREATE DIRECT FTL AND LTL TRUCK COSTS/TIMES SHIPMENTS BETWEEN TWO HAWAIIAN ZONES (OTHERWISE TRUCK IS NOT AN OPTION FOR THESE DIRECT SHIPMENTS) -- ###*;   	  
+     if (o=179 & dest=180) or (o=180 & dest=179) then do;	  
+       tFTL = GCD/&LHTruckMPH ; 
+       cFTL = &ExpressSurcharge*GCD*&FTL53rate ;
+       tLTL = GCD/&LHTruckMPH ; 
+       cLTL = &ExpressSurcharge*GCD*&LTL53rate ;
+	   mlT31 = GCD;                *** -- mileage for minpath 31,46 -- ***;
+     end;
    end;
-  end;
 		
 		
    * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --;  
@@ -927,10 +1012,6 @@ data i(drop=temp); set i;
 data i; set i; by o dest reverse;
   if last.dest;
   
-data check; set i(where=(cw145>0));
-data check2; set check(obs=20);
-  proc print; title "Inland Water review";  
-
   
    * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --;  
    ** ========  FINAL TEMPLATE CHECK  ======== **;   
@@ -1219,7 +1300,7 @@ data P.modepath_costs; set i;
   mile[1] = mlW145;
   mile[2] = mlW146;
   mile[3] = mlR3;
-  mile[4] = mlR3;
+  mile[4] = mlR4;
   mile[5] = mlR147;
   mile[6] = mlR148;
   mile[7] = mlR149;
@@ -1229,7 +1310,7 @@ data P.modepath_costs; set i;
   mile[11] = mlR149;
   mile[12] = mlR150;
   mile[13] = mlR3;
-  mile[14] = mlR3;
+  mile[14] = mlR4;
   mile[15] = mlR147;
   mile[16] = mlR148;
   mile[17] = mlR149;
@@ -1437,7 +1518,7 @@ proc export outfile=mzskims dbms=csv replace;
 *###=================================================================================###
     -- CREATE PORTS FILE FOR MESO MODEL --
 *###=================================================================================###;
-data port(keep=Origin Destination Port_mesozone Port_name); set P.modepath_costs(where=(Port_mesozone is not null));
+data port(keep=Origin Destination Port_mesozoneNB Port_NameNB Port_mesozoneB Port_NameB); set P.modepath_costs(where=(Port_mesozoneNB is not null));
   proc sort nodupkey; by Origin Destination;
 
 data port(rename=(Origin=Production_zone Destination=Consumption_zone)); set port;
