@@ -19,7 +19,7 @@ setwd(basedir)
 #load the workspace for creating the PMG inputs
 #includes naics_set table and monitoring settings in model$scenvars
 load(file.path(outputdir,"PMG_Workspace.Rdata"))
-library(rFreight)
+library(rFreight, lib.loc = "./library/")
 loadPackage("data.table")
 loadPackage("sendmailR")
 
