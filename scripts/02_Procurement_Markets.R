@@ -406,21 +406,21 @@ create_pmg_inputs <- function(naics,g,sprod){
   print(paste("Writing buy and sell files for ",naics,"group",g))
   
   #All consumers for this group write PMG input and create table for merging
-  write.csv(consc[group==g,list(InputCommodity,BuyerID,Zone,NAICS,Size,OutputCommodity,PurchaseAmountTons,PrefWeight1_UnitCost,PrefWeight2_ShipTime,SingleSourceMaxFraction)],
-            file = file.path(model$outputdir,paste0(naics, "_g", g, ".buy.csv")),row.names = FALSE)
+  fwrite(consc[group==g,list(InputCommodity,BuyerID,Zone,NAICS,Size,OutputCommodity,PurchaseAmountTons,PrefWeight1_UnitCost,PrefWeight2_ShipTime,SingleSourceMaxFraction)],
+            file = file.path(model$outputdir,paste0(naics, "_g", g, ".buy.csv")))
   conscg <- consc[group==g,list(InputCommodity,NAICS,Zone,Buyer.SCTG,BuyerID,Size,ConVal,PurchaseAmountTons)]
   
   #If splitting produers, write out each group and else write all with output capacity reduced
   if(sprod==1){
-    write.csv(prodc[group==g,list(OutputCommodity,SellerID,Zone,NAICS,Size,OutputCapacityTons,NonTransportUnitCost)],
-              file = file.path(model$outputdir,paste0(naics, "_g", g, ".sell.csv")),row.names = FALSE)
+    fwrite(prodc[group==g,list(OutputCommodity,SellerID,Zone,NAICS,Size,OutputCapacityTons,NonTransportUnitCost)],
+              file = file.path(model$outputdir,paste0(naics, "_g", g, ".sell.csv")))
     prodcg <- prodc[group==g,list(OutputCommodity,NAICS,Commodity_SCTG,SellerID,Size,Zone,OutputCapacityTons)]
   } else {
     #reduce capacity based on demand in this group
     consamount <- sum(conscg$PurchaseAmountTons)/sum(consc$PurchaseAmountTons)
     prodc[,OutputCapacityTonsG:= OutputCapacityTons * consamount]
-    write.csv(prodc[,list(OutputCommodity,SellerID,Zone,NAICS,Size,OutputCapacityTons=OutputCapacityTonsG,NonTransportUnitCost)],
-              file = file.path(model$outputdir,paste0(naics, "_g", g, ".sell.csv")),row.names = FALSE)
+    fwrite(prodc[,list(OutputCommodity,SellerID,Zone,NAICS,Size,OutputCapacityTons=OutputCapacityTonsG,NonTransportUnitCost)],
+              file = file.path(model$outputdir,paste0(naics, "_g", g, ".sell.csv")))
     prodcg <- prodc[,list(OutputCommodity,NAICS,Commodity_SCTG,SellerID,Size,Zone,OutputCapacityTons=OutputCapacityTonsG)]
   }
   
@@ -615,7 +615,7 @@ create_pmg_inputs <- function(naics,g,sprod){
   #pc[, c("Tag2_PortOfOrigin", "Tag3_PortOfEntry") := ""]
   
   #write out the costs file for this group
-  write.csv(pc, file = file.path(model$outputdir,paste0(naics, "_g", g, ".costs.csv")), row.names = FALSE)
+  fwrite(pc, file = file.path(model$outputdir,paste0(naics, "_g", g, ".costs.csv")))
   
   ## Heither, revised 10-05-2015: File Cleanup if Outputs folder being re-used from previous run
   ## -- Delete NAICS_gX.out file if exists from prior run (existence will prevent PMG from running)

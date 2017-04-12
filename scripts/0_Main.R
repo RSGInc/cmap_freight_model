@@ -14,9 +14,18 @@
 #Define Model/Scenario Control Variables/Inputs/Packages/Steps
 #---------------------------------------------------------------------
 
+#1.Set the base directory (the directory in which the model resides)
+#basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
+basedir <- getwd()
+
+#2. Set the scnario to run -- same as the folder name inside the scenarios directory
+scenario <- "base"
+
+#3. Run the model 
+
 #rFreight install zip should be in base directory of model
-install.packages(file.path(basedir,"rFreight_0.1.zip"),repos=NULL)
-library(rFreight)
+install.packages(file.path(basedir,"rFreight_0.1.zip"),repos=NULL, lib = "./library/" )
+library(rFreight, lib.loc = "./library/")
 
 #define the components that comprise the model: name, titles, scripts
 steps <- c("firmsyn","pmg","pmgcon","pmgout","daysamp","whouse","vehtour","stopseq","stopdur","tourtod","preptt")
@@ -45,10 +54,16 @@ progressManager("Start",model$logs$Step_RunTimes, model$scenvars$outputlog, mode
                 model$scenvars$outputprofile, model$logs$Profile_Log, model$logs$Profile_Summary)
 
 # split this out to run steps seperately more easily
-# functionalize the step 3 stuff to allow just certain markets to ru
-# change 03_PMG_Controller.R to using parallel insteadn of 
+# functionalize the step 3 stuff to allow just certain markets to run
+# change 03_PMG_Controller.R to using parallel instead of tasklist approach
 
-lapply(model$stepscripts,source)
+#lapply(model$stepscripts,source)
+source(model$stepscripts[1]) #Firm Synthesis
+source(model$stepscripts[2]) #Prepare Procurement Markets
+source(model$stepscripts[3]) #PMG Controller (running the PMGs)
+source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
+
+#source(model$stepscripts[5:11]) #Truck Touring Model
 
 save(list=c("model",model$steps),file=file.path(model$outputdir,"modellists.Rdata"))
 

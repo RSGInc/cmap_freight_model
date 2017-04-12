@@ -20,7 +20,8 @@ progressNextStep("Combining PMG Output files")
 naicsrun <- 1L #counter
 load(file.path(model$outputdir,"naics_set.Rdata"))
 ### -- Heither, 02-24-2017: testing: no 327390
-naics_set <- subset(naics_set, NAICS %in% c(324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330))
+#naics_set <- subset(naics_set, NAICS %in% c(324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330))
+naics_set <- subset(naics_set, NAICS %in% c(324122))
 naicstorun <- nrow(naics_set)
 naicspairs <- list() #list to hold the summarized outputs
 
@@ -100,9 +101,9 @@ sctgCat <- sctgCat[,list(Commodity_SCTG,Category)]
 setkey(sctgCat,Commodity_SCTG)
 setkey(pair2,Commodity_SCTG)
 pair2 <- sctgCat[pair2]
-pair2[, Port_mesozone:=ifelse(substr(Category,1,4)=="Bulk", Port_mesozoneB, Port_mesozoneNB)]
-pair2[, Port_name:=ifelse(substr(Category,1,4)=="Bulk", as.character(Port_NameB), as.character(Port_NameNB))]
-pair2[,c("Port_mesozoneB","Port_mesozoneNB","Port_NameB","Port_NameNB"):=NULL]
+#pair2[, Port_mesozone:=ifelse(substr(Category,1,4)=="Bulk", Port_mesozoneB, Port_mesozoneNB)]
+#pair2[, Port_name:=ifelse(substr(Category,1,4)=="Bulk", as.character(Port_NameB), as.character(Port_NameNB))]
+#pair2[,c("Port_mesozoneB","Port_mesozoneNB","Port_NameB","Port_NameNB"):=NULL]
 
 ## -- Imports
 pair2[Production_zone>273 & Consumption_zone<=273 & IntlDone==0,Active:=1]

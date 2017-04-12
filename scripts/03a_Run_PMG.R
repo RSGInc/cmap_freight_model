@@ -34,7 +34,7 @@ load(file.path(outputdir,"PMG_Workspace.Rdata"))
 load(file.path(outputdir,paste0(naics,".Rdata")))
 
 #load required packages
-library(rFreight)
+library(rFreight, lib.loc = "./library/")
 loadPackage("data.table")
 loadPackage("reshape")
 loadPackage("reshape2")
