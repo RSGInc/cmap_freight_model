@@ -23,7 +23,8 @@ scenario <- "base"
 
 #3. Run the model 
 
-#rFreight install zip should be in base directory of model
+#rFreight install zip should be in directory within model
+if(!dir.exists("./library")){ dir.create("./library") }
 install.packages(file.path(basedir,"rFreight_0.1.zip"),repos=NULL, lib = "./library/" )
 library(rFreight, lib.loc = "./library/")
 
