@@ -94,12 +94,24 @@ progressManager("Start",model$logs$Step_RunTimes, model$scenvars$outputlog, mode
 # change 03_PMG_Controller.R to using parallel instead of tasklist approach
 
 #lapply(model$stepscripts,source)
-source(model$stepscripts[1]) #Firm Synthesis
-source(model$stepscripts[2]) #Prepare Procurement Markets
+
+isPMGDevelopmentMode <-
+  dir.exists(model$outputdir) && interactive() && (Sys.info()[["user"]] == "peter.andrews")
+if (isPMGDevelopmentMode) {
+  print("NOTICE -- skipping steps 1 & 2 because in isPMGDevelopmentMode")
+} else {
+  source(model$stepscripts[1]) #Firm Synthesis
+  source(model$stepscripts[2]) #Prepare Procurement Markets
+}
 source(model$stepscripts[3]) #PMG Controller (running the PMGs)
 source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
 
-#source(model$stepscripts[5:11]) #Truck Touring Model
+if (isPMGDevelopmentMode) {
+  print("NOTICE -- skipping steps 5:11 because in isPMGDevelopmentMode")
+} else {
+  source(model$stepscripts[5:11]) #Truck Touring Model
+}
+
 
 save(list=c("model",model$steps),file=file.path(model$outputdir,"modellists.Rdata"))
 
