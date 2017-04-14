@@ -1,7 +1,7 @@
 ##############################################################################################
 #Title:             CMAP Agent Based Freight Forecasting Code
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
-#Description:       0_Main.R controls the model flow and sources in other scripts to run
+#Description:       00_Main.R controls the model flow and sources in other scripts to run
 #                   components of the model. The code as whole implements the national supply
 #                   chain freight framework, which is bassed on earlier work for FHWA carried
 #                   out by RSG
@@ -17,7 +17,13 @@
 #1.Set the base directory (the directory in which the model resides)
 #basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
 
-getScriptDirectory <- function(systemFrames, debug = TRUE) {
+#' getScriptDirectory MUST be called with sys.frames(). It cannot be gotten inside the function because the frames will be different then
+#' and the fileName of the current script may no longer be available.
+#' This will return the location of the calling script.
+#' Unfortunately this cannot be moved to 00_utilities.R because until we actually have
+#' the current script directory we don't know how to source any other file
+#' because we want to use relative paths and they have to relative to something KNOWN
+getScriptDirectory <- function(systemFrames, debug = FALSE) {
   stopifnot(!is.null(systemFrames))
   debug = TRUE
   scriptPath <- NULL
@@ -52,7 +58,11 @@ getScriptDirectory <- function(systemFrames, debug = TRUE) {
 
 scriptDir <- getScriptDirectory(sys.frames())
 basedir <- dirname(scriptDir) #basedir is the root of the github repo -- one above the scripts directory
+#there is code, such as source statments that assume the working directory is set to base
+setwd(basedir)
 print(paste0("basedir: ", basedir))
+
+source("./scripts/00_Utilities.R")
 
 #2. Set the scnario to run -- same as the folder name inside the scenarios directory
 scenario <- "base"
@@ -82,7 +92,7 @@ model <- startModel(basedir=basedir,scenarioname=scenario,
 rm(basedir,scenario,steps,steptitles,stepscripts)
 
 #Load file paths to model inputs, outputs, and workspaces
-source("./scripts/0_File_Locations.R")
+source("./scripts/00_File_Locations.R")
 
 #-----------------------------------------------------------------------------------
 #Run model steps
@@ -96,10 +106,8 @@ progressManager("Start",model$logs$Step_RunTimes, model$scenvars$outputlog, mode
 
 #lapply(model$stepscripts,source)
 
-isPMGDevelopmentMode <-
-  dir.exists(model$outputdir) && (length(list.files(model$outputdir)) > 10) && interactive() && (Sys.info()[["user"]] == "peter.andrews")
-if (isPMGDevelopmentMode) {
-  print("NOTICE -- skipping steps 1 & 2 because in isPMGDevelopmentMode")
+if (isPeterDevelopmentMode) {
+  print("NOTICE -- skipping steps 1 & 2 because in isPeterDevelopmentMode")
 } else {
   source(model$stepscripts[1]) #Firm Synthesis
   source(model$stepscripts[2]) #Prepare Procurement Markets
@@ -107,8 +115,8 @@ if (isPMGDevelopmentMode) {
 source(model$stepscripts[3]) #PMG Controller (running the PMGs)
 source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
 
-if (isPMGDevelopmentMode) {
-  print("NOTICE -- skipping steps 5:11 because in isPMGDevelopmentMode")
+if (isPeterDevelopmentMode) {
+  print("NOTICE -- skipping steps 5:11 because in isPeterDevelopmentMode")
 } else {
   source(model$stepscripts[5:11]) #Truck Touring Model
 }

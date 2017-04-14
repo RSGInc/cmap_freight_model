@@ -1,7 +1,7 @@
 ##############################################################################################
 #Title:             CMAP Agent Based Freight Forecasting Code
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
-#Description:       0_Create_rFreight.R creates the rFreight package
+#Description:       00_Create_rFreight.R creates the rFreight package
 #Date:              May 7, 2015
 #Author:            Resource Systems Group, Inc.
 #Copyright:         Copyright 2015 RSG, Inc. - All rights reserved.
@@ -36,7 +36,7 @@ inputrclist <- list() #for holding row and col numbers
 
 for (i in 1:length(inputfiles)){
   objname <- sub(".csv","",inputfiles[i])
-  assign(objname, read.csv(file.path(pathtobase,inputfiles[i])))  
+  assign(objname, read.csv(file.path(pathtobase,inputfiles[i])))
   save(list=objname, file=paste0("./rFreight/data/",sub(".csv","",inputfiles[i]),".rda"))
   inputrclist[[i]] <- list(objname,
                            nrow(get(objname)),

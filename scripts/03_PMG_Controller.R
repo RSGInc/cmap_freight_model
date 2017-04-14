@@ -11,79 +11,8 @@
 ##async tools
 ##########################################
 useFuture <- TRUE
-library(future)
-
-asyncFutureTasksRunning <- list()
-
-startAsyncFutureTask <-
-  function(asyncDataName, futureObj, callback = NULL) {
-    debugConsole(paste0(
-      "startAsyncFutureTask asyncDataName '",
-      asyncDataName,
-      "' called"
-    ))
-     asyncFutureTasksRunning[[asyncDataName]] <<-
-      list(futureObj = futureObj,
-           callback = callback)
-  } #end startAsyncFutureTask
-
-
-checkAsyncFutureTasksRunning <- function()
-{
-  invalidateLater(DEFAULT_POLL_INTERVAL)
-  for (asyncDataName in names(asyncFutureTasksRunning)) {
-    asyncFutureObject <- asyncFutureTasksRunning[[asyncDataName]]$futureObj
-    if (resolved(asyncFutureObject)) {
-      debugConsole(paste0(
-        "checkAsyncFutureTasksRunning resolved: '",
-        asyncDataName,
-        "'"
-      ))
-      #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
-      tryCatch(
-        expr = {
-          asyncResult <<- value(asyncFutureObject)
-        },
-        warning = function(w) {
-          debugConsole(
-            paste0(
-              "checkAsyncFutureTasksRunning: '",
-              asyncDataName,
-              "' returned a warning: ",
-              w
-            )
-          )
-        },
-        error = function(e) {
-          debugConsole(
-            paste0(
-              "checkAsyncFutureTasksRunning: '",
-              asyncDataName,
-              "' returned an error: ",
-              e
-            )
-          )
-        }
-      )#end tryCatch
-      callback <- asyncFutureTasksRunning[[asyncDataName]]$callback
-      asyncFutureTasksRunning[[asyncDataName]] <<- NULL
-      if (!is.null(callback)) {
-        callback(asyncDataName, asyncResult)
-      }
-    } #end if resolved
-  }#end loop over async data items being loaded
-  #Any more asynchronous data items being loaded?
-  if (length(asyncFutureTasksRunning) == 0) {
-    #could do something here
-  }
-} # end checkAsyncFutureTasksRunning
-
-debugConsole <- function(msg) {
-  time <- paste(Sys.time())
-  print(paste0(time, ": ", msg))
-  flush.console()
-}
-
+debugFuture <- TRUE
+source("./scripts/00_Async_Tasks.R")
 ########################################
 
 #-----------------------------------------------------------------------------------
@@ -112,7 +41,7 @@ naicstorun <- nrow(naics_set)
 while (naicscostrun <= naicstorun){
 
   if (useFuture) {
-    numrscript <- length(asyncFutureTasksRunning)
+    numrscript <- checkAsyncTasksRunning(debug = debugFuture)
   } else {
     #get current running tasks
   tasklist <- system2( 'tasklist' , stdout = TRUE )
@@ -132,22 +61,25 @@ while (naicscostrun <= naicstorun){
     sprod <- ifelse(naics_set$Split_Prod[naicscostrun],1,0)
     rScriptCmd <- paste("Rscript .\\scripts\\03_0a_Supplier_to_Buyer_Costs.R",naics,groups,sprod,model$basedir,model$outputdir)
     if (useFuture) {
-      startAsyncFutureTask(
+      startAsyncTask(
         as.character(naics),
         future({
           system(rScriptCmd,wait=TRUE)
         }),
-        callback = function(asyncDataName, asyncResult) {
+        callback = function(asyncDataName, asyncResult, error, warning) {
           debugConsole(
             paste0(
               "callback asyncDataName '",
               asyncDataName,
               "' returning with data of size ",
-              object.size(asyncResult)
+              object.size(asyncResult),
+              " Error: ", error,
+              " Warning: ", warning
             )
           )
-        } #end callback
-      ) #end call to startAsyncFutureTask
+        }, #end callback
+        debug = debugFuture
+      ) #end call to startAsyncTask
     } #end if useFuture
     else {
       system(rScriptCmd,wait=FALSE)
@@ -185,7 +117,7 @@ if (model$scenvars$pmgmonitoring) system(paste("Rscript .\\scripts\\03b_Monitor_
 while (naicsrun <= naicstorun){
 
   if (useFuture) {
-    numrscript <- length(asyncFutureTasksRunning)
+    numrscript <- checkAsyncTasksRunning(debug = debugFuture)
   } else {
     #get current running tasks
     tasklist <- system2( 'tasklist' , stdout = TRUE )
@@ -193,7 +125,7 @@ while (naicsrun <= naicstorun){
     #look for number of PMGs running
     tasklist.tasks <- substr( tasklist[ -(1:3) ] , 1 , 25 )
     tasklist.tasks <- gsub( " " , "" , tasklist.tasks )
-    numrscript <- length(asyncFutureTasksRunning) #length(tasklist.tasks[tasklist.tasks=="Rscript.exe"])
+    numrscript <- length(asyncTasksRunning) #length(tasklist.tasks[tasklist.tasks=="Rscript.exe"])
   }
   print(paste("Rscript processes running:",numrscript, "Current time",Sys.time()))
 
@@ -205,22 +137,24 @@ while (naicsrun <= naicstorun){
     sprod <- ifelse(naics_set$Split_Prod[naicsrun],1,0)
     rScriptCmd <- paste("Rscript .\\scripts\\03a_Run_PMG.R",naics,groups,sprod,model$basedir,model$outputdir)
     if (useFuture) {
-      startAsyncFutureTask(
+      startAsyncTask(
         as.character(naics),
         future({
           system(rScriptCmd,wait=TRUE)
         }),
-        callback = function(asyncDataName, asyncResult) {
+        callback = function(asyncDataName, asyncResult, error, warning) {
           debugConsole(
             paste0(
               "callback asyncDataName '",
               asyncDataName,
               "' returning with data of size ",
-              object.size(asyncResult)
+              object.size(asyncResult),
+              " Error: ", error,
+              " Warning: ", warning
             )
           )
         } #end callback
-      ) #end call to startAsyncFutureTask
+      ) #end call to startAsyncTask
     } #end if useFuture
     else {
       system(rScriptCmd,wait=FALSE)

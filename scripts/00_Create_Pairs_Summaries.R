@@ -1,7 +1,7 @@
 ##############################################################################################
 #Title:             CMAP Agent Based Freight Forecasting Code
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
-#Description:       0_Create_Pairs_Summaries.R makes some tabulations of the pairs table
+#Description:       00_Create_Pairs_Summaries.R makes some tabulations of the pairs table
 #Date:              June 30, 2015
 #Author:            Resource Systems Group, Inc.
 #Copyright:         Copyright 2015 RSG, Inc. - All rights reserved.
