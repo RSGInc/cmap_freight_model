@@ -11,7 +11,8 @@ library(data.table)
 library(bit64)
 library(reshape2)
 
-basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
+#basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
+basedir <- getwd()
 scenario <- "base"
 
 #large file so take some time to load into memory
