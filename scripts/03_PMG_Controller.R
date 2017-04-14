@@ -8,6 +8,84 @@
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
 ##############################################################################################
 
+##async tools
+##########################################
+useFuture <- TRUE
+library(future)
+
+asyncFutureTasksRunning <- list()
+
+startAsyncFutureTask <-
+  function(asyncDataName, futureObj, callback = NULL) {
+    debugConsole(paste0(
+      "startAsyncFutureTask asyncDataName '",
+      asyncDataName,
+      "' called"
+    ))
+     asyncFutureTasksRunning[[asyncDataName]] <<-
+      list(futureObj = futureObj,
+           callback = callback)
+  } #end startAsyncFutureTask
+
+
+checkAsyncFutureTasksRunning <- function()
+{
+  invalidateLater(DEFAULT_POLL_INTERVAL)
+  for (asyncDataName in names(asyncFutureTasksRunning)) {
+    asyncFutureObject <- asyncFutureTasksRunning[[asyncDataName]]$futureObj
+    if (resolved(asyncFutureObject)) {
+      debugConsole(paste0(
+        "checkAsyncFutureTasksRunning resolved: '",
+        asyncDataName,
+        "'"
+      ))
+      #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
+      tryCatch(
+        expr = {
+          asyncResult <<- value(asyncFutureObject)
+        },
+        warning = function(w) {
+          debugConsole(
+            paste0(
+              "checkAsyncFutureTasksRunning: '",
+              asyncDataName,
+              "' returned a warning: ",
+              w
+            )
+          )
+        },
+        error = function(e) {
+          debugConsole(
+            paste0(
+              "checkAsyncFutureTasksRunning: '",
+              asyncDataName,
+              "' returned an error: ",
+              e
+            )
+          )
+        }
+      )#end tryCatch
+      callback <- asyncFutureTasksRunning[[asyncDataName]]$callback
+      asyncFutureTasksRunning[[asyncDataName]] <<- NULL
+      if (!is.null(callback)) {
+        callback(asyncDataName, asyncResult)
+      }
+    } #end if resolved
+  }#end loop over async data items being loaded
+  #Any more asynchronous data items being loaded?
+  if (length(asyncFutureTasksRunning) == 0) {
+    #could do something here
+  }
+} # end checkAsyncFutureTasksRunning
+
+debugConsole <- function(msg) {
+  time <- paste(Sys.time())
+  print(paste0(time, ": ", msg))
+  flush.console()
+}
+
+########################################
+
 #-----------------------------------------------------------------------------------
 #Step 3 PMG Controller
 #-----------------------------------------------------------------------------------
@@ -33,13 +111,17 @@ naicstorun <- nrow(naics_set)
 
 while (naicscostrun <= naicstorun){
 
-  #get current running tasks
+  if (useFuture) {
+    numrscript <- length(asyncFutureTasksRunning)
+  } else {
+    #get current running tasks
   tasklist <- system2( 'tasklist' , stdout = TRUE )
 
   #look for number of Groups running
   tasklist.tasks <- substr( tasklist[ -(1:3) ] , 1 , 25 )
   tasklist.tasks <- gsub( " " , "" , tasklist.tasks )
   numrscript <- length(tasklist.tasks[tasklist.tasks=="Rscript.exe"])
+  }
   print(paste("Supplier-Buyer Costs Rscript processes running:",numrscript, "Current time",Sys.time()))
 
   #is this less than max to run at once?
@@ -48,8 +130,29 @@ while (naicscostrun <= naicstorun){
     naics <- naics_set$NAICS[naicscostrun]
     groups <- naics_set$groups[naicscostrun]
     sprod <- ifelse(naics_set$Split_Prod[naicscostrun],1,0)
-    system(paste("Rscript .\\scripts\\03_0a_Supplier_to_Buyer_Costs.R",naics,groups,sprod,model$basedir,model$outputdir),wait=FALSE)
-	print(paste("Starting:",naics))
+    rScriptCmd <- paste("Rscript .\\scripts\\03_0a_Supplier_to_Buyer_Costs.R",naics,groups,sprod,model$basedir,model$outputdir)
+    if (useFuture) {
+      startAsyncFutureTask(
+        as.character(naics),
+        future({
+          system(rScriptCmd,wait=TRUE)
+        }),
+        callback = function(asyncDataName, asyncResult) {
+          debugConsole(
+            paste0(
+              "callback asyncDataName '",
+              asyncDataName,
+              "' returning with data of size ",
+              object.size(asyncResult)
+            )
+          )
+        } #end callback
+      ) #end call to startAsyncFutureTask
+    } #end if useFuture
+    else {
+      system(rScriptCmd,wait=FALSE)
+    }
+    print(paste("Starting:",naics))
     naicscostrun <- naicscostrun + 1L
   } else {
     Sys.sleep( 30 )
@@ -81,13 +184,17 @@ if (model$scenvars$pmgmonitoring) system(paste("Rscript .\\scripts\\03b_Monitor_
 
 while (naicsrun <= naicstorun){
 
-  #get current running tasks
-  tasklist <- system2( 'tasklist' , stdout = TRUE )
+  if (useFuture) {
+    numrscript <- length(asyncFutureTasksRunning)
+  } else {
+    #get current running tasks
+    tasklist <- system2( 'tasklist' , stdout = TRUE )
 
-  #look for number of PMGs running
-  tasklist.tasks <- substr( tasklist[ -(1:3) ] , 1 , 25 )
-  tasklist.tasks <- gsub( " " , "" , tasklist.tasks )
-  numrscript <- length(tasklist.tasks[tasklist.tasks=="Rscript.exe"])
+    #look for number of PMGs running
+    tasklist.tasks <- substr( tasklist[ -(1:3) ] , 1 , 25 )
+    tasklist.tasks <- gsub( " " , "" , tasklist.tasks )
+    numrscript <- length(asyncFutureTasksRunning) #length(tasklist.tasks[tasklist.tasks=="Rscript.exe"])
+  }
   print(paste("Rscript processes running:",numrscript, "Current time",Sys.time()))
 
   #is this less than max to run at once?
@@ -96,15 +203,38 @@ while (naicsrun <= naicstorun){
     naics <- naics_set$NAICS[naicsrun]
     groups <- naics_set$groups[naicsrun]
     sprod <- ifelse(naics_set$Split_Prod[naicsrun],1,0)
-    system(paste("Rscript .\\scripts\\03a_Run_PMG.R",naics,groups,sprod,model$basedir,model$outputdir),wait=FALSE)
+    rScriptCmd <- paste("Rscript .\\scripts\\03a_Run_PMG.R",naics,groups,sprod,model$basedir,model$outputdir)
+    if (useFuture) {
+      startAsyncFutureTask(
+        as.character(naics),
+        future({
+          system(rScriptCmd,wait=TRUE)
+        }),
+        callback = function(asyncDataName, asyncResult) {
+          debugConsole(
+            paste0(
+              "callback asyncDataName '",
+              asyncDataName,
+              "' returning with data of size ",
+              object.size(asyncResult)
+            )
+          )
+        } #end callback
+      ) #end call to startAsyncFutureTask
+    } #end if useFuture
+    else {
+      system(rScriptCmd,wait=FALSE)
+    }
     print(paste("Starting:",naics))
     naicsrun <- naicsrun + 1L
   } else {
     Sys.sleep( 30 )
   }
-}
+} #end while (naicsrun <= naicstorun)
 
 
 
 pmgcon <- progressEnd(pmgcon)
+
+
 

@@ -17,11 +17,11 @@
 #1.Set the base directory (the directory in which the model resides)
 #basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
 
-getScriptDirectory <- function(systemFrames=sys.frames(), debug = TRUE) {
-
+getScriptDirectory <- function(systemFrames, debug = TRUE) {
+  stopifnot(!is.null(systemFrames))
   debug = TRUE
   scriptPath <- NULL
-  possibleFieldNames <- c("fileName")
+  possibleFieldNames <- c("fileName", "ofile", "path")
   for (frame in  systemFrames) {
     namesInFrame <- names(frame)
     if (debug) print(paste0("frame has these fields: ", paste0(collapse=", ", namesInFrame)))
@@ -50,7 +50,8 @@ getScriptDirectory <- function(systemFrames=sys.frames(), debug = TRUE) {
   return(scriptDir)
 } #end getScriptDirectory
 
-basedir <- dirname(getScriptDirectory()) #basedir is the root of the github repo -- one above the scripts directory
+scriptDir <- getScriptDirectory(sys.frames())
+basedir <- dirname(scriptDir) #basedir is the root of the github repo -- one above the scripts directory
 print(paste0("basedir: ", basedir))
 
 #2. Set the scnario to run -- same as the folder name inside the scenarios directory
@@ -96,7 +97,7 @@ progressManager("Start",model$logs$Step_RunTimes, model$scenvars$outputlog, mode
 #lapply(model$stepscripts,source)
 
 isPMGDevelopmentMode <-
-  dir.exists(model$outputdir) && interactive() && (Sys.info()[["user"]] == "peter.andrews")
+  dir.exists(model$outputdir) && (length(list.files(model$outputdir)) > 10) && interactive() && (Sys.info()[["user"]] == "peter.andrews")
 if (isPMGDevelopmentMode) {
   print("NOTICE -- skipping steps 1 & 2 because in isPMGDevelopmentMode")
 } else {
