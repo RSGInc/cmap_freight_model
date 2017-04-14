@@ -21,37 +21,37 @@ naicsrun <- 1L #counter
 load(file.path(model$outputdir,"naics_set.Rdata"))
 ### -- Heither, 02-24-2017: testing: no 327390
 #naics_set <- subset(naics_set, NAICS %in% c(324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330))
-naics_set <- subset(naics_set, NAICS %in% c(324122))
+naics_set <- subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 naicstorun <- nrow(naics_set)
 naicspairs <- list() #list to hold the summarized outputs
 
 while (naicsrun <= naicstorun){
-  
+
   #check if the next naics market is ready
   if (file.exists(file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],".txt")))){
-    
+
     naicslog <- readLines(file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],".txt")))
-    
+
     if(length(naicslog)>0){
-      
+
       if(grepl("Completed Processing Outputs",naicslog[length(naicslog)],fixed=TRUE)){
-        
+
         print(paste("Reading Outputs from Industry",naicsrun,":",naics_set$NAICS[naicsrun]))
         load(file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],".Rdata")))
-        #apply fix for bit64/data.table handling of large integers in rbindlist 
+        #apply fix for bit64/data.table handling of large integers in rbindlist
         pairs[,Quantity.Traded:=as.character(Quantity.Traded)]
         pairs[,Last.Iteration.Quantity:=as.character(Last.Iteration.Quantity)]
         naicspairs[[naicsrun]] <- pairs
         naicsrun <- naicsrun + 1L
-        
+
       } else {
         Sys.sleep( 30 )
       }
-      
+
     } else {
       Sys.sleep( 30 )
     }
-      
+
   } else {
     Sys.sleep( 30 )
   }
@@ -86,7 +86,7 @@ if(file.exists(model$recycle_check)){
 ## add code for shipments b/n zone and port (create input file first)
 loadPackage("plyr")
 pair1 <- pairs[MinPath<51]
-pair2 <- pairs[MinPath>=51]		## international shipping 
+pair2 <- pairs[MinPath>=51]		## international shipping
 load(file.path(model$basedir,"rFreight/data/data_modepath_ports.rda"))
 ports <- as.data.table(data_modepath_ports)
 setkey(ports,Production_zone,Consumption_zone)
@@ -139,7 +139,7 @@ setkey(pair2,Production_zone,Consumption_zone)
 df_fin <- minLogisticsCost(pair2,1)
 setnames(df_fin,c("time","path","minc"),c("Attribute2_ShipTime","MinPath","MinGmnql"))
 setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG)
-setkey(pair2,SellerID,BuyerID,NAICS,Commodity_SCTG)  
+setkey(pair2,SellerID,BuyerID,NAICS,Commodity_SCTG)
 pair2 <- pair2[df_fin]
 pair2[, Attribute1_UnitCost := MinGmnql / PurchaseAmountTons]
 pair2[, Attribute2_ShipTime := Attribute2_ShipTime / 24] 			### Convert from hours to days

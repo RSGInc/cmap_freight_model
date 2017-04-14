@@ -1,14 +1,14 @@
 ##############################################################################################
 #Title:             CMAP Agent Based Freight Forecasting Code
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
-#Description:       0_Main.R controls the model flow and sources in other scripts to run 
+#Description:       0_Main.R controls the model flow and sources in other scripts to run
 #                   components of the model. The code as whole implements the national supply
 #                   chain freight framework, which is bassed on earlier work for FHWA carried
 #                   out by RSG
 #Date:              January 28, 2014
 #Author:            Resource Systems Group, Inc.
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
-############################################################################################## 
+##############################################################################################
 
 #---------------------------------------------------------------------
 #Define Model/Scenario Control Variables/Inputs/Packages/Steps
@@ -16,12 +16,47 @@
 
 #1.Set the base directory (the directory in which the model resides)
 #basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
-basedir <- getwd()
+
+getScriptDirectory <- function(systemFrames=sys.frames(), debug = TRUE) {
+
+  debug = TRUE
+  scriptPath <- NULL
+  possibleFieldNames <- c("fileName")
+  for (frame in  systemFrames) {
+    namesInFrame <- names(frame)
+    if (debug) print(paste0("frame has these fields: ", paste0(collapse=", ", namesInFrame)))
+    for (possibleFieldName in possibleFieldNames) {
+      if (possibleFieldName %in% namesInFrame) {
+        scriptPath <- frame[[possibleFieldName]]
+        if (debug)
+          print(paste0("got scriptPath from '", possibleFieldName, "'"))
+        break
+      } #end if found filedName
+    } #end for loop over possible field names
+    if (!is.null(scriptPath)) {
+      break
+    }
+  } #end loop over frames
+
+  if (is.null(scriptPath)) {
+    if (debug) print(paste0("Could not find script path in frames so trying to get scriptPath from rstudioapi::getActiveDocumentContext()$path"))
+    scriptPath <- rstudioapi::getActiveDocumentContext()$path
+  }
+  scriptDir <- dirname(scriptPath)
+  if (debug)
+    print(paste0("scriptPath: '",  scriptPath, "'"))
+  if (debug)
+    print(paste0("scriptDir: '",  scriptDir, "'"))
+  return(scriptDir)
+} #end getScriptDirectory
+
+basedir <- dirname(getScriptDirectory()) #basedir is the root of the github repo -- one above the scripts directory
+print(paste0("basedir: ", basedir))
 
 #2. Set the scnario to run -- same as the folder name inside the scenarios directory
 scenario <- "base"
 
-#3. Run the model 
+#3. Run the model
 
 #rFreight install zip should be in directory within model
 if(!dir.exists("./library")){ dir.create("./library") }
@@ -51,7 +86,7 @@ source("./scripts/0_File_Locations.R")
 #-----------------------------------------------------------------------------------
 #Run model steps
 #-----------------------------------------------------------------------------------
-progressManager("Start",model$logs$Step_RunTimes, model$scenvars$outputlog, model$logs$Main_Log, 
+progressManager("Start",model$logs$Step_RunTimes, model$scenvars$outputlog, model$logs$Main_Log,
                 model$scenvars$outputprofile, model$logs$Profile_Log, model$logs$Profile_Summary)
 
 # split this out to run steps seperately more easily
@@ -68,7 +103,7 @@ source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
 
 save(list=c("model",model$steps),file=file.path(model$outputdir,"modellists.Rdata"))
 
-progressManager("Stop",model$logs$Step_RunTimes, model$scenvars$outputlog, model$logs$Main_Log, 
+progressManager("Stop",model$logs$Step_RunTimes, model$scenvars$outputlog, model$logs$Main_Log,
                 model$scenvars$outputprofile, model$logs$Profile_Log, model$logs$Profile_Summary)
 
 
