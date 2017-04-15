@@ -19,13 +19,11 @@
 
 #use 'here' to determine project root.
 #devtools install will skip install if latest version already installed
-suppressMessages(devtools::install_github("krlmlr/here"))library(here) #https://github.com/krlmlr/here
+suppressMessages(devtools::install_github("krlmlr/here"))
 basedir <- here::here() #basedir is the root of the github repo -- one above the scripts directory
 print(paste0("basedir: ", basedir))
 #there is code, such as source statments that assume the working directory is set to base
 setwd(basedir)
-
-source("./scripts/00_Utilities.R")
 
 #2. Set the scnario to run -- same as the folder name inside the scenarios directory
 scenario <- "base"
@@ -125,6 +123,8 @@ progressManager(
 # change 03_PMG_Controller.R to using parallel instead of tasklist approach
 
 #lapply(model$stepscripts,source)
+
+source("./scripts/00_Utilities.R") #defines isPeterDevelopmentMode
 
 if (isPeterDevelopmentMode && exists("ineligible")) {
   print("NOTICE -- skipping steps 1 & 2 because in isPeterDevelopmentMode")
