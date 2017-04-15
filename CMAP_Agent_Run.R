@@ -8,8 +8,11 @@
 ##############################################################################################
 
 #1.Set the base directory (the directory in which the model resides)
+#use 'here' to determine project root.
+#devtools install will skip install if latest version already installed
+suppressMessages(devtools::install_github("krlmlr/here"))
 #basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
-basedir <- getwd()
+basedir <- here::here()
 
 #2. Set the scnario to run -- same as the folder name inside the scenarios directory
 scenario <- "base"

@@ -17,127 +17,10 @@
 #1.Set the base directory (the directory in which the model resides)
 #basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
 
-#' This will return the location of the calling script.
-#' Unfortunately this cannot be moved to a utilities script because until we actually have
-#' the current script directory we don't know how to source any other file
-#' because we want to use relative paths and they have to relative to something KNOWN
-
-getScriptPathFromFrame <- function(frame, debug=FALSE) {
-  scriptPath <- NULL
-  if (!is.null(frame)) {
-    frameAttributes <- attributes(frame)
-    if (debug) print(paste0('names(frameAttributes): ', paste0(collapse=", ", names(frameAttributes))))
-    possibleFieldNames <- c("srcfile", "filename", "fileName", "ofile")
-    namesInFrame <- names(frame)
-    if (debug) print(paste0('namesInFrame: ', paste0(collapse=", ", namesInFrame)))
-    fieldNamesInFrame <- namesInFrame[namesInFrame %in% possibleFieldNames]
-    if (debug) print(paste0('fieldNamesInFrame: ', fieldNamesInFrame))
-    for (fieldNameInFrame in fieldNamesInFrame) {
-      if (debug) print(paste0(fieldNameInFrame, '=', frame[[fieldNameInFrame]]))
-    }
-    if (length(fieldNamesInFrame) > 0) {
-      fieldName <- fieldNamesInFrame[1]
-      scriptPath <- frame[[fieldName]]
-      if (debug) print(paste0("Used frame variable '", fieldName, "' to set scriptPath to '",scriptPath, "'."))
-    } #end if found fieldName
-  } #end if frame not null
-  if (debug && is.null(scriptPath)){
-    print(paste0("getScriptPathFromFrame returning NULL!"))
-  }
-  return(scriptPath)
-} # getScriptPathFromFrame
-
-getScriptPath <- function(debug = FALSE, sysStatus=sys.status()) {
-  scriptPath <- NULL
-  sysCallAttributes <-  attributes(sysStatus$sys.calls[[1]])
-  print(paste0("names(sysCallAttributes): ", paste0(collapse = ", ", names(
-    sysCallAttributes
-  ))))
-  if ("srcref" %in% names(sysCallAttributes)) {
-    srcref <- sysCallAttributes[["srcref"]]
-    srcfile <- attr(srcref, "srcfile")
-    scriptPath <- srcfile[["filename"]]
-    if (debug)
-      print(
-        paste0(
-          "Used srcref in sys.call() attributes to set scriptPath to: '",
-          scriptPath,
-          "'."
-        )
-      )
-  } else {
-    try(silent = TRUE, expr = {
-      scriptPath <<- rstudioapi::getActiveDocumentContext()$path
-      if (debug)
-        print(
-          paste0(
-            "Used rstudioapi::getActiveDocumentContext()$path to set scriptPath to: '",
-            scriptPath,
-            "'."
-          )
-        )
-    })
-  }
-  if (is.null(scriptPath)) {
-    #first check in the current frame
-    scriptPath <- getScriptPathFromFrame(sys.frame(), debug)
-    if (is.null(scriptPath)) {
-      #if not found check all frames
-      systemFrames <- sysStatus$sys.frames
-      if (debug)
-        print(paste0("length(systemFrames): ", length(systemFrames)))
-
-      for (frame in  systemFrames) {
-        scriptPath <- getScriptPathFromFrame(frame, debug)
-        if (!is.null(scriptPath)) {
-          break
-        }
-      } #end loop over frames
-    } #end if not in the current frame
-  } #end if need to check frames
-  if (debug)
-    print(paste0(
-      "getScriptPath returning scriptPath '",
-      scriptPath,
-      "'."
-    ))
-  return(scriptPath)
-} #end getScriptPath
-
-getScriptDir <- function(debug = FALSE) {
-  #http://stackoverflow.com/a/30306616/283973
-  scriptDir <- getSrcDirectory(function(x) {
-    x
-  })
-  print(paste0(
-    'script dir from anonymous function: class: ',
-    class(scriptDir),
-    " value: ",
-    scriptDir
-  ))
-  if (is.character(scriptDir) &&
-      (length(scriptDir) > 0) && (nchar(scriptDir) > 0)) {
-    if (debug)
-      print(paste0(
-        "getSrcDirectory of anonymous function found scriptDir '",
-        scriptDir,
-        "'."
-      ))
-  } else {
-    scriptPath <- getScriptPath(debug)
-    if (is.character(scriptDir) &&
-        (length(scriptDir) > 0) && (nchar(scriptDir) > 0)) {
-      scriptDir <- dirname(scriptPath)
-    } else {
-      stop("Could not determine script directory!")
-    }
-  }
-  return(scriptDir)
-} #end getScriptDir
-
-scriptDir <- getScriptDir(TRUE)
-basedir <-
-  dirname(scriptDir) #basedir is the root of the github repo -- one above the scripts directory
+#use 'here' to determine project root.
+#devtools install will skip install if latest version already installed
+suppressMessages(devtools::install_github("krlmlr/here"))library(here) #https://github.com/krlmlr/here
+basedir <- here::here() #basedir is the root of the github repo -- one above the scripts directory
 print(paste0("basedir: ", basedir))
 #there is code, such as source statments that assume the working directory is set to base
 setwd(basedir)
@@ -223,11 +106,6 @@ rm(basedir, scenario, steps, steptitles, stepscripts)
 #Load file paths to model inputs, outputs, and workspaces
 source("./scripts/00_File_Locations.R")
 
-isPeterDevelopmentMode <-
-  dir.exists(model$outputdir) &&
-  (length(list.files(model$outputdir)) > 10) &&
-  interactive() &&
-  (Sys.info()[["user"]] == "peter.andrews")
 
 #-----------------------------------------------------------------------------------
 #Run model steps
