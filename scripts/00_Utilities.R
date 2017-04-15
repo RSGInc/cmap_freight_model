@@ -9,5 +9,3 @@ debugConsole <- function(msg) {
   flush.console()
 }
 
-isPeterDevelopmentMode <-
-  dir.exists(model$outputdir) && (length(list.files(model$outputdir)) > 10) && interactive() && (Sys.info()[["user"]] == "peter.andrews")

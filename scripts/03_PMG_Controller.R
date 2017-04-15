@@ -73,8 +73,7 @@ while (naicscostrun <= naicstorun){
               asyncDataName,
               "' returning with data of size ",
               object.size(asyncResult),
-              " Error: ", error,
-              " Warning: ", warning
+              if (!is.null(error)) paste0(" Error: ", error) else (if (!is.null(warning)) paste0(" Warning: ", warning) else "")
             )
           )
         }, #end callback
@@ -149,8 +148,7 @@ while (naicsrun <= naicstorun){
               asyncDataName,
               "' returning with data of size ",
               object.size(asyncResult),
-              " Error: ", error,
-              " Warning: ", warning
+              if (!is.null(error)) paste0(" Error: ", error) else (if (!is.null(warning)) paste0(" Warning: ", warning) else "")
             )
           )
         } #end callback
