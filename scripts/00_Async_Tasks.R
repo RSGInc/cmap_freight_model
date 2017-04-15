@@ -15,13 +15,17 @@ source("./scripts/00_utilities.R")
 asyncTasksRunning <- list()
 
 startAsyncTask <-
-  function(asyncDataName, futureObj, callback = NULL, debug=FALSE) {
+  function(asyncTaskName, futureObj, callback = NULL, debug=FALSE) {
     if (debug) debugConsole(paste0(
-      "startAsyncTask asyncDataName '",
-      asyncDataName,
+      "startAsyncTask asyncTaskName '",
+      asyncTaskName,
       "' called"
     ))
-    asyncTasksRunning[[asyncDataName]] <<-
+
+    if(exists(asyncTaskName, asyncTasksRunning)) {
+      stop("Error: A task with the same asyncTaskName '", asyncTaskName, "' is already running. It is not known if it is running the same task")
+    }
+    asyncTasksRunning[[asyncTaskName]] <<-
       list(futureObj = futureObj,
            callback = callback)
   } #end startAsyncTask
@@ -29,14 +33,24 @@ startAsyncTask <-
 
 #' Meant to called periodically, this will check all running asyncTasks for completion
 #' Returns number of remaining tasks so could be used as a boolean
-checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE)
+checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE, maximumTasksToResolve = -1)
 {
-  for (asyncDataName in names(asyncTasksRunning)) {
-    asyncObject <- asyncTasksRunning[[asyncDataName]]$futureObj
+  numTasksResolved <- 0
+  for (asyncTaskName in names(asyncTasksRunning)) {
+    if ((maximumTasksToResolve > 0) && (numTasksResolved >= maximumTasksToResolve)) {
+      if (debug) debugConsole(
+        paste0(
+          "checkAsyncTasksRunning: stopping checking for resolved tasks because maximumTasksToResolve (", maximumTasksToResolve, ") already resolved."
+        )
+      )
+      break
+    } #end checking if need to break because of maximumTasksToResolve
+    asyncObject <- asyncTasksRunning[[asyncTaskName]]$futureObj
     if (resolved(asyncObject)) {
+      numTasksResolved <- numTasksResolved + 1
       if (debug) debugConsole(paste0(
         "checkAsyncTasksRunning resolved: '",
-        asyncDataName,
+        asyncTaskName,
         "'"
       ))
       #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
@@ -52,7 +66,7 @@ checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE)
           debugConsole(
             paste0(
               "checkAsyncTasksRunning: '",
-              asyncDataName,
+              asyncTaskName,
               "' returned a warning: ",
               w
             )
@@ -63,7 +77,7 @@ checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE)
           debugConsole(
             paste0(
               "checkAsyncTasksRunning: '",
-              asyncDataName,
+              asyncTaskName,
               "' returned an error: ",
               e
             )
@@ -76,10 +90,10 @@ checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE)
         #therefore will propagate to the caller
         asyncResult <<- value(asyncObject)
       }
-      callback <- asyncTasksRunning[[asyncDataName]]$callback
-      asyncTasksRunning[[asyncDataName]] <<- NULL
+      callback <- asyncTasksRunning[[asyncTaskName]]$callback
+      asyncTasksRunning[[asyncTaskName]] <<- NULL
       if (!is.null(callback)) {
-        callback(asyncDataName, asyncResult, caughtError, caughtWarning)
+        callback(asyncTaskName, asyncResult, caughtError, caughtWarning)
       }
     } #end if resolved
   }#end loop over async data items being loaded
