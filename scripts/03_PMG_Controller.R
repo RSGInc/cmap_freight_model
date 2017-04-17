@@ -10,7 +10,7 @@
 
 ##async tools
 ##########################################
-useFuture <- TRUE
+useFuture <- FALSE
 debugFuture <- TRUE
 source("./scripts/00_Async_Tasks.R")
 ########################################
@@ -40,54 +40,13 @@ naicstorun <- nrow(naics_set)
 
 while (naicscostrun <= naicstorun){
 
-  if (useFuture) {
-    numrscript <- checkAsyncTasksRunning(debug = debugFuture)
-  } else {
-    #get current running tasks
-  tasklist <- system2( 'tasklist' , stdout = TRUE )
-
-  #look for number of Groups running
-  tasklist.tasks <- substr( tasklist[ -(1:3) ] , 1 , 25 )
-  tasklist.tasks <- gsub( " " , "" , tasklist.tasks )
-  numrscript <- length(tasklist.tasks[tasklist.tasks=="Rscript.exe"])
-  }
-  print(paste("Supplier-Buyer Costs Rscript processes running:",numrscript, "Current time",Sys.time()))
-
-  #is this less than max to run at once?
-  #If yes, run one more, if the next is available, else wait and then check
-  if (numrscript < model$scenvars$maxcostrscripts){
-    naics <- naics_set$NAICS[naicscostrun]
+   naics <- naics_set$NAICS[naicscostrun]
     groups <- naics_set$groups[naicscostrun]
     sprod <- ifelse(naics_set$Split_Prod[naicscostrun],1,0)
     rScriptCmd <- paste("Rscript .\\scripts\\03_0a_Supplier_to_Buyer_Costs.R",naics,groups,sprod,model$basedir,model$outputdir)
-    if (useFuture) {
-      startAsyncTask(
-        as.character(naics),
-        future({
-          system(rScriptCmd,wait=TRUE)
-        }),
-        callback = function(asyncDataName, asyncResult, error, warning) {
-          debugConsole(
-            paste0(
-              "callback asyncDataName '",
-              asyncDataName,
-              "' returning with data of size ",
-              object.size(asyncResult),
-              if (!is.null(error)) paste0(" Error: ", error) else (if (!is.null(warning)) paste0(" Warning: ", warning) else "")
-            )
-          )
-        }, #end callback
-        debug = debugFuture
-      ) #end call to startAsyncTask
-    } #end if useFuture
-    else {
-      system(rScriptCmd,wait=FALSE)
-    }
+    system(rScriptCmd,wait=TRUE)
     print(paste("Starting:",naics))
     naicscostrun <- naicscostrun + 1L
-  } else {
-    Sys.sleep( 30 )
-  }
 }
 
 
@@ -103,6 +62,7 @@ naicstorun <- nrow(naics_set)
 costs_files <- paste0(rep(naics_set$NAICS, times = naics_set$groups), "_g", unlist(lapply(naics_set$groups, seq)), ".costs.csv")
 
 while (!all(file.exists(file.path(model$outputdir,costs_files)))){
+  print(paste0(collapse=", ", file.path(model$outputdir,costs_files), " exists?: ", file.exists(file.path(model$outputdir,costs_files))))
   print(paste("Waiting for PMG Inputs Files to be Prepared: Current time",Sys.time()))
   Sys.sleep( 30 )
 }

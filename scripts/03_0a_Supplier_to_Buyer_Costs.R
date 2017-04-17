@@ -16,62 +16,146 @@ outputdir <- args[5]
 setwd(basedir)
 
 #Start logging
-PMGset_Log <- file.path(outputdir,paste0(naics,"_PMGSetup_Log.txt"))
-log <- file(PMGset_Log,open="wt") 
-sink(log, split=T)
-sink(log,type="message")
+PMGset_Log <- file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt"))
+log <- file(PMGset_Log, open = "wt")
+sink(log, split = T)
+sink(log, type = "message")
 
 #load the pmg workspace
-load(file.path(outputdir,"PMG_Workspace.Rdata"))
-     
+load(file.path(outputdir, "PMG_Workspace.Rdata"))
+
 #load the workspace for this naics code
-load(file.path(outputdir,paste0(naics,".Rdata")))
+load(file.path(outputdir, paste0(naics, ".Rdata")))
 
 #load required packages
 library(rFreight, lib.loc = "./library/")
 loadPackage("data.table")
 loadPackage("reshape")
 loadPackage("reshape2")
-options(datatable.auto.index=FALSE)
+options(datatable.auto.index = FALSE)
 
 #check whether sampling within the group has been done and if not run that function
-if(!"group" %in% names(prodc)) create_pmg_sample_groups(naics,groups,sprod)
+if (!"group" %in% names(prodc))
+  create_pmg_sample_groups(naics, groups, sprod)
 
 #file to hold timings
-setuptimes <- file(file.path(outputdir,paste0(naics,"_PMGSetup_Log.txt")),open="wt")
-writeLines(paste("Starting:",naics, "Current time",Sys.time()), con=setuptimes)
+setuptimes <-
+  file(file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt")), open = "wt")
+writeLines(paste("Starting:", naics, "Current time", Sys.time()), con =
+             setuptimes)
+
+##async tools
+##########################################
+useFuture <- TRUE
+debugFuture <- TRUE
+source("./scripts/00_Async_Tasks.R")
+########################################
 
 #loop over the groups and prepare the files for running the games
-for (g in 1:groups){
+for (g in 1:groups) {
+  numTasksRunning <- checkAsyncTasksRunning(debug = debugFuture)
 
-  model$Current_Commodity <- naics		## Heither, 12-01-2015: store current NAICS value
-  model$recycle_check <- file.path(model$outputdir,"recycle_check_initial.txt")
+  #is this less than max to run at once?
+  #If yes, run one more, if the next is available, else wait and then check
+  if (numTasksRunning < model$scenvars$maxcostrscripts) {
+    startAsyncTask(
+      paste0(
+        "Supplier_to_Buyer_Costs_naics-",
+        naics,
+        "_group-",
+        g,
+        "_sprod-",
+        sprod
+      ),
+      future({
+        model$Current_Commodity <-
+          naics		## Heither, 12-01-2015: store current NAICS value
+        model$recycle_check <-
+          file.path(model$outputdir, "recycle_check_initial.txt")
 
-  ## Heither, revised 10-05-2015: File Cleanup if Outputs folder being re-used from previous run
-  ## -- Delete NAICS_gX.sell file if exists from prior run (existence will prevent create_pmg_inputs from running)
-  if(file.exists(file.path(outputdir,paste0(naics,"_g", g, ".sell.csv")))){
-	file.remove(file.path(outputdir,paste0(naics,"_g", g, ".sell.csv")))
+        ## Heither, revised 10-05-2015: File Cleanup if Outputs folder being re-used from previous run
+        ## -- Delete NAICS_gX.sell file if exists from prior run (existence will prevent create_pmg_inputs from running)
+        if (file.exists(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))) {
+          file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
+        }
+
+        if (!file.exists(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))) {
+          msg <- paste(
+            "Starting:",
+            naics,
+            "Group",
+            g,
+            "Current time",
+            Sys.time()
+          )
+          writeLines(print(msg),
+          con = setuptimes)
+
+          writeLines(print(paste(
+            "Making Inputs:",
+            naics,
+            "Group",
+            g,
+            "Current time",
+            Sys.time()
+          )),
+          con = setuptimes)
+          create_pmg_inputs(naics, g, sprod)
+
+          if (!model$scenvars$pmglogging) {
+            pmggrouptimes <-
+              file(file.path(outputdir, paste0(naics, "_g", g, ".txt")), open = "wt")
+            writeLines(print(msg),
+            con = pmggrouptimes)
+          }
+        }
+      }),
+      callback = function(asyncDataName,
+                          asyncResult,
+                          error,
+                          warning) {
+        debugConsole(
+          paste0(
+            "callback asyncDataName '",
+            asyncDataName,
+            "' returning with data of size ",
+            object.size(asyncResult),
+            if (!is.null(error))
+              paste0(" Error: ", error)
+            else
+              (if (!is.null(warning))
+                paste0(" Warning: ", warning)
+               else
+                 "")
+          )
+        )
+      },
+      #end callback
+      debug = debugFuture
+    ) #end call to startAsyncTask
+  } #end if room to add another running task
+  else {
+    Sys.sleep(30)
   }
-  
-  if(!file.exists(file.path(outputdir,paste0(naics,"_g", g, ".sell.csv")))){
-    print(paste("Starting:",naics,"Group",g, "Current time",Sys.time()))
-    writeLines(paste("Starting:",naics,"Group",g, "Current time",Sys.time()), con=setuptimes) 
-  
-    print(paste("Making Inputs:",naics,"Group",g, "Current time",Sys.time()))
-    create_pmg_inputs(naics,g,sprod) 
-        
-    if(!model$scenvars$pmglogging) {
-      pmggrouptimes <- file(file.path(outputdir,paste0(naics,"_g", g, ".txt")),open="wt")
-      writeLines(paste("Starting:",naics,"Group",g, "Current time",Sys.time()), con=pmggrouptimes)
-    }  
-  }     
+} #end loop over groups
+
+#wait until all tasks are finished
+while (checkAsyncTasksRunning(debug = debugFuture) > 0) {
+  Sys.sleep(30)
 }
 
 #close off logging
-writeLines(paste("Completed Processing Outputs:",naics, "Current time",Sys.time()), con=setuptimes)
+writeLines(print(paste(
+  "Completed Processing Outputs:",
+  naics,
+  "Current time",
+  Sys.time()
+)),
+con = setuptimes)
 close(setuptimes)
 
 #end sinking
-sink(type="message")
+sink(type = "message")
 sink()
 
+quit(save="no", status=0) #set status
