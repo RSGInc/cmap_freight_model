@@ -5,8 +5,10 @@
 #' This simply adds a timestamp and prints a message to the console which is immediately flushed
 debugConsole <- function(msg) {
   time <- paste(Sys.time())
-  print(paste0(time, ": ", msg))
+  logLine <- paste0(time, ": ", msg)
+  print(logLine)
   flush.console()
+  return(logLine)
 }
 
 isPeterDevelopmentMode <-
