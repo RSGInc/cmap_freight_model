@@ -100,4 +100,4 @@ close(pmgtimes)
 #end sinking
 sink(type="message")
 sink()
-quit(save = FALSE, status = 0)
+quit(save = "no", status = 0)
