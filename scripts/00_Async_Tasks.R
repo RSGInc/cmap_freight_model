@@ -8,7 +8,7 @@
 #Copyright:         Copyright 2017 RSG, Inc. - All rights reserved.
 ##############################################################################################
 library(future)
-plan(multiprocess)
+plan(multisession)
 
 source("./scripts/00_utilities.R")
 
@@ -25,11 +25,44 @@ startAsyncTask <-
     if(exists(asyncTaskName, asyncTasksRunning)) {
       stop("Error: A task with the same asyncTaskName '", asyncTaskName, "' is already running. It is not known if it is running the same task")
     }
-    asyncTasksRunning[[asyncTaskName]] <<-
-      list(futureObj = futureObj,
-           callback = callback)
+    asyncTaskObject <- list(futureObj = futureObj,
+                            taskName = asyncTaskName,
+         callback = callback,
+         startTime = Sys.time())
+    asyncTasksRunning[[asyncTaskName]] <<- asyncTaskObject
   } #end startAsyncTask
 
+processRunningTasks <- function(useFuture, debug=FALSE) {
+  numRScriptsRunning <- -1
+  if (useFuture) {
+    numRScriptsRunning <- checkAsyncTasksRunning(debug = debugFuture)
+    if (debug) {
+      print(paste0(Sys.time(), ": remaining ", getRunningTasksStatus()))
+    }
+  } else {
+    #get current running tasks
+    tasklist <- system2('tasklist' , stdout = TRUE)
+
+    #look for number of Groups running
+    tasklist.tasks <- substr(tasklist[-(1:3)] , 1 , 25)
+    tasklist.tasks <- gsub(" " , "" , tasklist.tasks)
+    numRScriptsRunning <-
+      length(tasklist.tasks[tasklist.tasks == "Rscript.exe"])
+  }
+  return(numRScriptsRunning)
+} #end processRunningTasks
+
+
+getRunningTasksStatus <- function() {
+  getRunningTaskStatus <- function(asyncTaskObject) {
+    runningTaskStatus <- paste0("[", asyncTaskObject[["taskName"]], "'s elapsed time: ",
+                                format(Sys.time()-asyncTaskObject[["startTime"]]),
+                                ", Finished?: ", resolved(asyncTaskObject[["futureObj"]]), "]")
+    return(runningTaskStatus)
+  }
+  runningTasksStatus <- paste("# of running tasks: ", length(asyncTasksRunning), paste0(collapse=", ", lapply(asyncTasksRunning, getRunningTaskStatus)))
+  return(runningTasksStatus)
+} #end getRunningTasksStatus
 
 #' Meant to called periodically, this will check all running asyncTasks for completion
 #' Returns number of remaining tasks so could be used as a boolean
@@ -45,21 +78,17 @@ checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE, maximumTask
       )
       break
     } #end checking if need to break because of maximumTasksToResolve
-    asyncObject <- asyncTasksRunning[[asyncTaskName]]$futureObj
-    if (resolved(asyncObject)) {
+    asyncTaskObject <- asyncTasksRunning[[asyncTaskName]]
+    asyncFutureObject <- asyncTaskObject$futureObj
+    if (resolved(asyncFutureObject)) {
       numTasksResolved <- numTasksResolved + 1
-      if (debug) debugConsole(paste0(
-        "checkAsyncTasksRunning resolved: '",
-        asyncTaskName,
-        "'"
-      ))
-      #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
+       #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
       caughtError <- NULL
       caughtWarning <- NULL
       if (catchErrors) {
       tryCatch(
         expr = {
-          asyncResult <- value(asyncObject)
+          taskResult <- value(asyncFutureObject)
         },
         warning = function(w) {
           caughtWarning <- w
@@ -88,15 +117,69 @@ checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE, maximumTask
       else {
         #simply fetch the value -- if exceptions happened they will be thrown by the Future library when we call value and
         #therefore will propagate to the caller
-        asyncResult <<- value(asyncObject)
+        taskResult <<- value(asyncFutureObject)
       }
+      startTime <- asyncTaskObject$startTime
+      endTime <- Sys.time()
+      elapsedTime <- format(endTime-startTime)
+      if (debug) debugConsole(paste0(
+        "checkAsyncTasksRunning finished: '",
+        asyncTaskName,
+        "'. startTime: ", startTime,
+        ", endTime: ", endTime,
+        "', elapsed time: ", elapsedTime
+      ))
       callback <- asyncTasksRunning[[asyncTaskName]]$callback
       asyncTasksRunning[[asyncTaskName]] <<- NULL
       if (!is.null(callback)) {
-        callback(asyncTaskName, asyncResult, caughtError, caughtWarning)
+        callback(list(asyncTaskName=asyncTaskName,
+                      taskResult=taskResult,
+                      startTime=startTime,
+                      endTime=endTime,
+                      elapsedTime=elapsedTime,
+                      caughtError=caughtError,
+                      caughtWarning=caughtWarning))
       }
     } #end if resolved
   }#end loop over async data items being loaded
   #Any more asynchronous data items being loaded?
   return(length(asyncTasksRunning))
 } # end checkAsyncTasksRunning
+
+testAsync <- function(loops = future::availableCores()-1) {
+  fakeDataProcessing <- function(name, duration, sys_sleep = FALSE) {
+    if (sys_sleep) {
+      Sys.sleep(duration)
+    } else {
+      start_time <- Sys.time()
+      elapsed_time <- -1
+      repeat{
+        elapsed_time = Sys.time() - start_time
+        print(paste0(name, " elapsed time: ", elapsed_time))
+        if (elapsed_time < duration) {
+          Sys.sleep(1)
+        } else {
+          break
+        }
+      } #end repeat
+    } #end else not using long sleep
+    return(data.frame(name = name, test = Sys.time()))
+  } #end fakeDataProcessing
+
+  loops <- future::availableCores()-1
+  baseWait <- 10
+  for(loopNumber in 1:loops) {
+    duration <- baseWait+loopNumber
+    dataName <- paste0("FAKE_PROCESSED_DATA_testLoop-", loopNumber, "_duration-", duration)
+    startAsyncTask(dataName, futureObj = future(fakeDataProcessing(dataName, duration)),debug = TRUE)
+    print(paste0("loop: ", loopNumber, " ", getRunningTasksStatus()))
+  }
+  print(paste0(Sys.time(), ": After all tasks submitted: ", getRunningTasksStatus()))
+  while(checkAsyncTasksRunning(debug=TRUE) > 0)
+  {
+    Sys.sleep(1)
+    print(getRunningTasksStatus())
+  }
+} #end testAsync
+
+#testAsync()

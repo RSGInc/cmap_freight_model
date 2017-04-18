@@ -8,17 +8,11 @@
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
 ##############################################################################################
 
-##async tools
-##########################################
-useFuture <- FALSE
-debugFuture <- TRUE
-source("./scripts/00_Async_Tasks.R")
-########################################
 
 #-----------------------------------------------------------------------------------
 #Step 3 PMG Controller
 #-----------------------------------------------------------------------------------
-progressStart(pmgcon,3)
+progressStart(pmgcon, 3)
 
 #------------------------------------------------------------------------------------------------------
 #Produce PMG inputs and run PMGs
@@ -27,26 +21,35 @@ progressNextStep("Producing Supplier to Buyer Costs")
 
 ## ---------------------------------------------------------------
 ## Heither, revised 12-01-2015: Add file to hold initial (PMG setup) SCTG recycling check data
-model$recycle_check <- file.path(model$outputdir,"recycle_check_initial.txt")
-if(file.exists(model$recycle_check)){
-	file.remove(model$recycle_check)
-  }
+model$recycle_check <-
+  file.path(model$outputdir, "recycle_check_initial.txt")
+if (file.exists(model$recycle_check)) {
+  file.remove(model$recycle_check)
+}
 ## ---------------------------------------------------------------
 
 naicscostrun <- 1L #counter
-load(file.path(model$outputdir,"naics_set.Rdata"))
-naics_set <- subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
+load(file.path(model$outputdir, "naics_set.Rdata"))
+naics_set <-
+  subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 naicstorun <- nrow(naics_set)
 
-while (naicscostrun <= naicstorun){
-
-   naics <- naics_set$NAICS[naicscostrun]
-    groups <- naics_set$groups[naicscostrun]
-    sprod <- ifelse(naics_set$Split_Prod[naicscostrun],1,0)
-    rScriptCmd <- paste("Rscript .\\scripts\\03_0a_Supplier_to_Buyer_Costs.R",naics,groups,sprod,model$basedir,model$outputdir)
-    system(rScriptCmd,wait=TRUE)
-    print(paste("Starting:",naics))
-    naicscostrun <- naicscostrun + 1L
+while (naicscostrun <= naicstorun) {
+  naics <- naics_set$NAICS[naicscostrun]
+  groups <- naics_set$groups[naicscostrun]
+  sprod <- ifelse(naics_set$Split_Prod[naicscostrun], 1, 0)
+  rScriptCmd <-
+    paste(
+      "Rscript .\\scripts\\03_0a_Supplier_to_Buyer_Costs.R",
+      naics,
+      groups,
+      sprod,
+      model$basedir,
+      model$outputdir
+    )
+  system(rScriptCmd, wait = TRUE)
+  print(paste("Starting:", naics))
+  naicscostrun <- naicscostrun + 1L
 }
 
 
@@ -54,79 +57,64 @@ while (naicscostrun <= naicstorun){
 progressNextStep("Running PMGs")
 
 naicsrun <- 1L #counter
-load(file.path(model$outputdir,"naics_set.Rdata"))
-naics_set <- subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
+load(file.path(model$outputdir, "naics_set.Rdata"))
+naics_set <-
+  subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 naicstorun <- nrow(naics_set)
 
 # have all of the input files been prepared? Don't proceed until they have...
-costs_files <- paste0(rep(naics_set$NAICS, times = naics_set$groups), "_g", unlist(lapply(naics_set$groups, seq)), ".costs.csv")
+costs_files <-
+  paste0(rep(naics_set$NAICS, times = naics_set$groups),
+         "_g",
+         unlist(lapply(naics_set$groups, seq)),
+         ".costs.csv")
 
-while (!all(file.exists(file.path(model$outputdir,costs_files)))){
-  print(paste0(collapse=", ", file.path(model$outputdir,costs_files), " exists?: ", file.exists(file.path(model$outputdir,costs_files))))
-  print(paste("Waiting for PMG Inputs Files to be Prepared: Current time",Sys.time()))
-  Sys.sleep( 30 )
+while (!all(file.exists(file.path(model$outputdir, costs_files)))) {
+  print(paste0(
+    collapse = ", ",
+    file.path(model$outputdir, costs_files),
+    " exists?: ",
+    file.exists(file.path(model$outputdir, costs_files))
+  ))
+  print(paste(
+    "Waiting for PMG Inputs Files to be Prepared: Current time",
+    Sys.time()
+  ))
+  Sys.sleep(30)
 }
 
 #Call the writePMGini function to write out the variables above to the PMG ini file at run time
-writePMGini(model$scenvars,"./PMG/PMG.ini")
+writePMGini(model$scenvars, "./PMG/PMG.ini")
 
 #start monitoring
-if (model$scenvars$pmgmonitoring) system(paste("Rscript .\\scripts\\03b_Monitor_PMG.R",model$basedir,model$outputdir),wait=FALSE)
+if (model$scenvars$pmgmonitoring)
+  system(
+    paste(
+      "Rscript .\\scripts\\03b_Monitor_PMG.R",
+      model$basedir,
+      model$outputdir
+    ),
+    wait = FALSE
+  )
 
-while (naicsrun <= naicstorun){
-
-  if (useFuture) {
-    numrscript <- checkAsyncTasksRunning(debug = debugFuture)
-  } else {
-    #get current running tasks
-    tasklist <- system2( 'tasklist' , stdout = TRUE )
-
-    #look for number of PMGs running
-    tasklist.tasks <- substr( tasklist[ -(1:3) ] , 1 , 25 )
-    tasklist.tasks <- gsub( " " , "" , tasklist.tasks )
-    numrscript <- length(asyncTasksRunning) #length(tasklist.tasks[tasklist.tasks=="Rscript.exe"])
-  }
-  print(paste("Rscript processes running:",numrscript, "Current time",Sys.time()))
-
-  #is this less than max to run at once?
-  #If yes, run one more, if the next is available, else wait and then check
-  if (numrscript < model$scenvars$maxrscriptinstances){
-    naics <- naics_set$NAICS[naicsrun]
-    groups <- naics_set$groups[naicsrun]
-    sprod <- ifelse(naics_set$Split_Prod[naicsrun],1,0)
-    rScriptCmd <- paste("Rscript .\\scripts\\03a_Run_PMG.R",naics,groups,sprod,model$basedir,model$outputdir)
-    if (useFuture) {
-      startAsyncTask(
-        as.character(naics),
-        future({
-          system(rScriptCmd,wait=TRUE)
-        }),
-        callback = function(asyncDataName, asyncResult, error, warning) {
-          debugConsole(
-            paste0(
-              "callback asyncDataName '",
-              asyncDataName,
-              "' returning with data of size ",
-              object.size(asyncResult),
-              if (!is.null(error)) paste0(" Error: ", error) else (if (!is.null(warning)) paste0(" Warning: ", warning) else "")
-            )
-          )
-        } #end callback
-      ) #end call to startAsyncTask
-    } #end if useFuture
-    else {
-      system(rScriptCmd,wait=FALSE)
-    }
-    print(paste("Starting:",naics))
-    naicsrun <- naicsrun + 1L
-  } else {
-    Sys.sleep( 30 )
-  }
+while (naicsrun <= naicstorun) {
+  naics <- naics_set$NAICS[naicsrun]
+  groups <- naics_set$groups[naicsrun]
+  sprod <- ifelse(naics_set$Split_Prod[naicsrun], 1, 0)
+  rScriptCmd <-
+    paste(
+      "Rscript .\\scripts\\03a_Run_PMG.R",
+      naics,
+      groups,
+      sprod,
+      model$basedir,
+      model$outputdir
+    )
+  system(rScriptCmd, wait = TRUE)
+  print(paste("Starting:", naics))
+  naicsrun <- naicsrun + 1L
 } #end while (naicsrun <= naicstorun)
 
 
 
 pmgcon <- progressEnd(pmgcon)
-
-
-

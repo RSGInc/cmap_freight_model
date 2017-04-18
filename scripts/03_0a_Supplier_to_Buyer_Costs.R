@@ -53,23 +53,25 @@ source("./scripts/00_Async_Tasks.R")
 
 #loop over the groups and prepare the files for running the games
 for (g in 1:groups) {
-  numTasksRunning <- checkAsyncTasksRunning(debug = debugFuture)
+  numTasksRunning <- processRunningTasks(useFuture, debugFuture)
 
   #is this less than max to run at once?
   #If yes, run one more, if the next is available, else wait and then check
   if (numTasksRunning < model$scenvars$maxcostrscripts) {
     startAsyncTask(
       paste0(
-        "Supplier_to_Buyer_Costs_naics-",
+        "Supplier_to_Buyer_Costs_makeInputs_naics-",
         naics,
         "_group-",
         g,
+        "_of_",
+        groups,
         "_sprod-",
         sprod
       ),
       future({
-        model$Current_Commodity <-
-          naics		## Heither, 12-01-2015: store current NAICS value
+        # model$Current_Commodity <-
+        #   naics		## Heither, 12-01-2015: store current NAICS value
         model$recycle_check <-
           file.path(model$outputdir, "recycle_check_initial.txt")
 
@@ -110,39 +112,39 @@ for (g in 1:groups) {
           }
         }
       }),
-      callback = function(asyncDataName,
-                          asyncResult,
-                          error,
-                          warning) {
-        debugConsole(
-          paste0(
-            "callback asyncDataName '",
-            asyncDataName,
-            "' returning with data of size ",
-            object.size(asyncResult),
-            if (!is.null(error))
-              paste0(" Error: ", error)
-            else
-              (if (!is.null(warning))
-                paste0(" Warning: ", warning)
-               else
-                 "")
-          )
-        )
-      },
-      #end callback
       debug = debugFuture
     ) #end call to startAsyncTask
   } #end if room to add another running task
   else {
+    if (debugFuture)
+      print(
+        paste0(
+          Sys.time(),
+          ": Waiting for some of the ",
+          numrscript,
+          " Supplier_to_Buyer_Costs_makeInputs running tasks to finish so can work on remaining ",
+          ((groups - g) + 1),
+          " tasks. Tasks: ",
+          getRunningTasksStatus()
+        )
+      )
     Sys.sleep(30)
   }
 } #end loop over groups
 
 #wait until all tasks are finished
-while (checkAsyncTasksRunning(debug = debugFuture) > 0) {
+while ((numrscript <- processRunningTasks()) > 0) {
+  if (debugFuture)
+    print(
+      paste0(
+        Sys.time(),
+        ": Waiting for final ",
+        numrscript,
+        " Supplier_to_Buyer_Costs_makeInputs tasks to finish."
+      )
+    )
   Sys.sleep(30)
-}
+} #end while final Supplier_to_Buyer_Costs_makeInputs tasks are still running
 
 #close off logging
 writeLines(print(paste(
