@@ -105,7 +105,7 @@ checkAsyncTasksRunning <- function(catchErrors = TRUE, debug=FALSE, maximumTasks
       if (catchErrors) {
       tryCatch(
         expr = {
-          taskResult <- value(asyncFutureObject)
+          taskResult <<- value(asyncFutureObject)
         },
         warning = function(w) {
           caughtWarning <- w

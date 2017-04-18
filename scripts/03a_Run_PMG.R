@@ -154,9 +154,9 @@ for (g in 1:groups) {
         msg <- paste(
           Sys.time(),
           "Completed:",
-          asyncResults$asyncTaskName,
+          asyncResults[["asyncTaskName"]],
           "Running time:",
-          asyncResults$elapsedTime
+          asyncResults[["elapsedTime"]]
         )
         if (!model$scenvars$pmglogging) {
           writeLines(msg,

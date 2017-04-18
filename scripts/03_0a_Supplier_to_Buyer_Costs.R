@@ -171,9 +171,9 @@ for (g in 1:groups) {
         paste0(
           Sys.time(),
           ": Finished ",
-          asyncResults$asyncTaskName,
-          " Running time: ",
-          asyncResults$elapsedTime
+          asyncResults[["asyncTaskName"]],
+          "Running time:",
+          asyncResults[["elapsedTime"]]
         ),
         file = baseLogFilePath,
         append = TRUE
