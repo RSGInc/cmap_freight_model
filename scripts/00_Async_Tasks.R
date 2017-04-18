@@ -55,18 +55,35 @@ processRunningTasks <- function(useFuture, debug=FALSE) {
 
 getRunningTasksStatus <- function() {
   getRunningTaskStatus <- function(asyncTaskObject) {
-    runningTaskStatus <- paste0("[", asyncTaskObject[["taskName"]], "'s elapsed time: ",
-                                format(Sys.time()-asyncTaskObject[["startTime"]]),
-                                ", Finished?: ", resolved(asyncTaskObject[["futureObj"]]), "]")
+    if (is.null(asyncTaskObject) ||
+        length(names(asyncTaskObject)) < 4) {
+      runningTaskStatus <- "[NULL]"
+    } else {
+      runningTaskStatus <-
+        paste0(
+          "[",
+          asyncTaskObject[["taskName"]],
+          "'s elapsed time: ",
+          format(Sys.time() - asyncTaskObject[["startTime"]]),
+          ", Finished?: ",
+          resolved(asyncTaskObject[["futureObj"]]),
+          "]"
+        )
+    }
     return(runningTaskStatus)
   }
-  runningTasksStatus <- paste("# of running tasks: ", length(asyncTasksRunning), paste0(collapse=", ", lapply(asyncTasksRunning, getRunningTaskStatus)))
+  runningTasksStatus <-
+    paste("# of running tasks: ",
+          length(asyncTasksRunning),
+          paste0(collapse = ", ", lapply(
+            asyncTasksRunning, getRunningTaskStatus
+          )))
   return(runningTasksStatus)
 } #end getRunningTasksStatus
 
 #' Meant to called periodically, this will check all running asyncTasks for completion
 #' Returns number of remaining tasks so could be used as a boolean
-checkAsyncTasksRunning <- function(catchErrors = FALSE, debug=FALSE, maximumTasksToResolve = -1)
+checkAsyncTasksRunning <- function(catchErrors = TRUE, debug=FALSE, maximumTasksToResolve = -1)
 {
   numTasksResolved <- 0
   for (asyncTaskName in names(asyncTasksRunning)) {
@@ -167,7 +184,7 @@ testAsync <- function(loops = future::availableCores()-1) {
   } #end fakeDataProcessing
 
   loops <- future::availableCores()-1
-  baseWait <- 10
+  baseWait <- 3
   for(loopNumber in 1:loops) {
     duration <- baseWait+loopNumber
     dataName <- paste0("FAKE_PROCESSED_DATA_testLoop-", loopNumber, "_duration-", duration)
@@ -180,6 +197,31 @@ testAsync <- function(loops = future::availableCores()-1) {
     Sys.sleep(1)
     print(getRunningTasksStatus())
   }
+  print(paste0("At the end the status should have no running tasks: ", getRunningTasksStatus()))
 } #end testAsync
 
 #testAsync()
+testAsyncWithSink <- function() {
+  sinkFile <- tempfile("asyncSinkTest_")
+  print(paste0("sinkFile: ", sinkFile))
+  log <- file(sinkFile, open = "wt")
+  if (!file.exists(sinkFile)) {
+    stop("expected temp file does not exist!")
+  }
+  print(paste0("start sink.number(type = 'output'): ", sink.number(type = "output")))
+  print(paste0("start sink.number(type = 'message'): ", sink.number(type = "message")))
+  sink(log, split = T)
+  sink(log, type = "message")
+  print(paste0("after sink sink.number(type = 'output'): ", sink.number(type = "output")))
+  print(paste0("after sink sink.number(type = 'message'): ", sink.number(type = "message")))
+  writeLines("Does calling writeLines when file is a sink cause problems?", log)
+  testAsync()
+  #remove sinks
+  sink(type = "message")
+  sink()
+  print(paste0("after unsink sink.number(type = 'output'): ", sink.number(type = "output")))
+  print(paste0("after unsink sink.number(type = 'message'): ", sink.number(type = "message")))
+  cat(paste0(collapse="\n",readLines(sinkFile)))
+  close(log)
+}
+#testAsyncWithSink()

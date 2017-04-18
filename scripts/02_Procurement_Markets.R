@@ -273,8 +273,10 @@ calcLogisticsCost <- function(dfspi, s, path) {
 ## Heither, revised 11-06-2015: revised mode exclusion logic due to new indirect truck modes for non-CMAP US shipments
 ## Heither, revised 11-24-2015: revised to include recycling check file
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [keep NAICS/Commodity_SCTG, return as stand-alone data.table]
-minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics) {
+minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics, group, recycle_check_file_path, log_file_path) {
+  #write(paste(1,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   s <- sctg[iSCTG]
+  #write(paste(2,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp <-
     merge(dfsp, cskims[, c(
       "Production_zone",
@@ -283,6 +285,7 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics) {
       paste0("cost", paths)
     ), with = F])
   numrows <- nrow(dfsp)
+  #write(paste(3,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp <-
     cbind(
       melt(
@@ -310,9 +313,12 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics) {
         value.name = "cost"
       )
     )
+  #write(paste(4,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp[, path := as.numeric(unlist(lapply(paths, rep, numrows)))]   ## store numeric path value; as.numeric to stop warning about int-num mismatch between dfsp & pc (Heither, 11-06-2015)
+  #write(paste(5,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp[, minc := unlist(lapply(paths, function(x)
     calcLogisticsCost(dfsp[path == x, list(PurchaseAmountTons, weight, ConVal, lssbd, time, cost)], s, x)))]
+  #write(paste(6,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   ## variables from model$scenvars
   CAP1Carload  <-
     model$scenvars$CAP1Carload    #Capacity of 1 Full Railcar
@@ -321,6 +327,7 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics) {
   CAP1Airplane <-
     model$scenvars$CAP1Airplane	#Capacity of 1 Airplane Cargo Hold
 
+  #write(paste(7,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp[, avail := TRUE]
   dfsp[path %in% 1:12 &
          weight < CAP1Carload, avail := FALSE] #Eliminate Water and Carload from choice set if Shipment Size < 1 Rail Carload
@@ -344,29 +351,34 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics) {
   dfsp <-
     dfsp[, list(SellerID, BuyerID, NAICS, Commodity_SCTG, time, path, minc)]
 
+  #write(paste(8,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   ###if(file.exists("E:/cmh/mode_check0.txt")){
   ###write.table(dfsp, file="E:/cmh/mode_check0.txt", row.names=F, col.names=F, append=TRUE, sep=",")
   ###} else {write.table(dfsp, file="E:/cmh/mode_check0.txt", row.names=F, sep=",")}
   numrows2 <- nrow(dfsp)
+  #write(paste(9,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
 
-  # cc <- model$Current_Commodity
-  rec_chk <- model$recycle_check
+  #write(paste(10,"minLogisticsCostSctgPaths group:",group, "naics:", naics, "recycle_check_file_path:",recycle_check_file_path), file=log_file_path, append=TRUE)
   x_write = c(naics, iSCTG, numrows, numrows2, length(paths))
+  #write(paste(11,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   write(x_write,
-        rec_chk,
+        recycle_check_file_path,
         ncolumns = length(x_write),
         append = TRUE)
+  #write(paste(12,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   return(dfsp)
 }
 
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [return stand-alone data.table]
-minLogisticsCost <- function(df, runmode, naics) {
+minLogisticsCost <- function(df, runmode, naics, group, recycle_check_file_path, log_file_path) {
   pass <- 0			### counter for number of passes through function
+  #write(paste(1, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
   for (iSCTG in unique(df$Commodity_SCTG)) {
-    print(paste("iSCTG: ", iSCTG))
+    write(paste("group:",group, "iSCTG: ", iSCTG), file=log_file_path, append=TRUE)
 
     ###### Heither, 02-09-2016: Runmode==0 - use for initial cost file development and shipper select best mode --
     if (runmode == 0)	{
+      #write(paste(2, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       #Direct (Limited to US Domestic) and anything within CMAP region (even if flagged as indirect): 4 direct mode-paths in the direct path choiceset: c(3,13,31,46)
       ### -- Heither, 10-15-2015: Selection Logic simplified due to enforcing Distribution channel logical consistency above -- ###
       ###df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG,c("MinGmnql","MinPath","Attribute2_ShipTime"):=minLogisticsCostSctgPaths(df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG],iSCTG,c(3,13,31,46), naics)]
@@ -375,7 +387,9 @@ minLogisticsCost <- function(df, runmode, naics) {
         df[(distchannel == 1 |
               (Production_zone < 151 &
                  Consumption_zone < 151)) & Commodity_SCTG == iSCTG]
-      df2 <- minLogisticsCostSctgPaths(df1, iSCTG, c(3, 13, 31, 46), naics)
+      #write(paste(3, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
+      df2 <- minLogisticsCostSctgPaths(df1, iSCTG, c(3, 13, 31, 46), naics, group, recycle_check_file_path, log_file_path)
+      #write(paste(4, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       if (nrow(df2) > 0) {
         if (pass == 0) {
           df_out <-
@@ -385,6 +399,7 @@ minLogisticsCost <- function(df, runmode, naics) {
           df_out <- rbind(df_out, df2)
         }
       }
+      #write(paste(5, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
 
       #Indirect and International: 50 indirect mode-paths in the path choiceset: c(1:2,4:12,14:30,32:45,47:54)
       ###df[distchannel>1 & (Production_zone>150 | Consumption_zone>150) & Commodity_SCTG==iSCTG,c("MinGmnql","MinPath","Attribute2_ShipTime"):=minLogisticsCostSctgPaths(df[distchannel>1 & (Production_zone>150 | Consumption_zone>150) & Commodity_SCTG==iSCTG],iSCTG,c(1:2,4:12,14:30,32:45,47:54), naics)]
@@ -393,8 +408,9 @@ minLogisticsCost <- function(df, runmode, naics) {
         df[distchannel > 1 &
              (Production_zone > 150 |
                 Consumption_zone > 150) & Commodity_SCTG == iSCTG]
+      #write(paste(5, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       df2 <-
-        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45, 47:54), naics)
+        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45, 47:54), naics, group, recycle_check_file_path, log_file_path)
       if (nrow(df2) > 0) {
         if (pass == 0) {
           df_out <- copy(df2)
@@ -403,11 +419,15 @@ minLogisticsCost <- function(df, runmode, naics) {
           df_out <- rbind(df_out, df2)
         }
       }
+      #write(paste(6, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
     } else {
+      #write(paste(7, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       ###### Heither, 02-09-2016: Runmode!=0 - use for shipments between domestic zone and domestic port --
       df1 <- df[Commodity_SCTG == iSCTG]
+      #write(paste(8, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       df2 <-
-        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45), naics)			## include inland water - 03-06-2017
+        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45), naics, group, recycle_check_file_path, log_file_path)			## include inland water - 03-06-2017
+      #write(paste(9, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       if (nrow(df2) > 0) {
         if (pass == 0) {
           df_out <- copy(df2)
@@ -416,15 +436,17 @@ minLogisticsCost <- function(df, runmode, naics) {
           df_out <- rbind(df_out, df2)
         }
       }
+      #write(paste(10, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
     }
   }
+  #write(paste(11, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
   ##### Heither, 02-05-2016: Following line for debugging only
   #####write.table(df_out, file="E:/cmh/mode_check1.txt", row.names=F, sep=",")
   return(df_out)
 }
 ## ---------------------------------------------------------------
 
-create_pmg_sample_groups <- function(naics, groups, sprod) {
+create_pmg_sample_groups <- function(naics, groups, sprod, log_file_path) {
   # sort by sizes
   setkey(consc, Size)
   setkey(prodc, Size)
@@ -469,14 +491,14 @@ create_pmg_sample_groups <- function(naics, groups, sprod) {
         nrow(consc[group == mingroup]) - 1 #leave at least one consumer in the group
       if (maxsample > 0) {
         #move consumers to other groups
-        print(paste(
+        write(paste(
           "Moving Consumers:",
           mingroup,
           "to",
           maxgroup,
           reqtomove,
           maxsample
-        ))
+        ), file=log_file_path, append=TRUE)
         #create a sample frame of the first maxsample records and identify a set that is just over reqtomove
         sampsellers <- sample.int(maxsample)
         constomove <-
@@ -488,7 +510,7 @@ create_pmg_sample_groups <- function(naics, groups, sprod) {
       } else {
         #no consumers left to move from this group so move some producers to it -- opposite direction
         maxsampleprod <- nrow(prodc[group == maxgroupprod]) - 1
-        print(
+        write(
           paste(
             "Moving Producers:",
             maxgroupprod,
@@ -496,8 +518,7 @@ create_pmg_sample_groups <- function(naics, groups, sprod) {
             mingroup,
             reqtomove,
             maxsampleprod
-          )
-        )
+          ), file=log_file_path, append=TRUE)
         #create a sample frame of the first maxsample records and identify a set that is just over reqtomove
         sampbuyers <- sample.int(maxsampleprod)
         prodstomove <-
@@ -620,10 +641,10 @@ predict_logit <- function(df,
   return(simchoice)
 }
 
-create_pmg_inputs <- function(naics, g, sprod) {
+create_pmg_inputs <- function(naics, g, sprod, recycle_check_file_path, log_file_path) {
   starttime <- proc.time()
 
-  print(paste("Writing buy and sell files for ", naics, "group", g))
+  write(paste("Writing buy and sell files for ", naics, "group", g), file=log_file_path, append=TRUE)
 
   #All consumers for this group write PMG input and create table for merging
   fwrite(consc[group == g, list(
@@ -696,12 +717,12 @@ create_pmg_inputs <- function(naics, g, sprod) {
       )]
   }
 
-  print(paste(
+  write(paste(
     "Applying distribution, shipment, and mode-path models to",
     naics,
     "group",
     g
-  ))
+  ), file=log_file_path, append=TRUE)
   # Rename ready to merge
   setnames(
     conscg,
@@ -720,7 +741,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
     pc[Production_zone <= 273 |
          Consumption_zone <= 273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
 
-  print("Organizing data for distribution channel model")
+  write(paste("group:", g, "Organizing data for distribution channel model"), file=log_file_path, append=TRUE)
   #Distribution size model
   #buyer/seller attributes
 
@@ -750,7 +771,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
     merge(pc, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
   setnames(pc, "GCD", "Distance")
 
-  print("Applying distribution channel model")
+  write(paste("group:", g, "Applying distribution channel model"), file=log_file_path, append=TRUE)
   #Apply choice model of distribution channel and iteratively adjust the ascs
   #The model estimated for mfg products was applied to all other SCTG commodities
   if (nrow(pc[Commodity_SCTG %in% c(1:9)]) > 0) {
@@ -761,7 +782,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
     df <-
       pc_food[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])))] #unique combinations of model coefficients
     df[, eval(unique(distchan_food$VAR[distchan_food$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-    print(paste(nrow(df), "unique combinations"))
+    write(paste("group:", g, nrow(df), "unique combinations"), file=log_file_path, append=TRUE)
     pc[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_food, distchan_cal, distchan_calcats, 4)]
   }
   if (nrow(pc[!Commodity_SCTG %in% c(1:9)]) > 0) {
@@ -773,7 +794,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
       pc_mfg[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])))] #unique combinations of model coefficients
     ####do this in the function (seems unecessary here)?
     df[, eval(unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-    print(paste(nrow(df), "unique combinations"))
+    write(paste("group:", g, nrow(df), "unique combinations"), file=log_file_path, append=TRUE)
     pc[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_mfg, distchan_cal, distchan_calcats, 4)]
   }
   rm(df)
@@ -794,7 +815,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
        !Production_zone %in% c(310, 399) &
        Consumption_zone <= 273, distchannel := 3]		### -- foreign origin (except Canada/Mexico) - U.S. destination
 
-  print("Organizing data for shipment size model")
+  write(paste("group:", g, "Organizing data for shipment size model"), file=log_file_path, append=TRUE)
   # Shipment size model
   # buyer/seller attributes
   pc[, log_dist := log10(Distance + 1)]
@@ -822,7 +843,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
   ####it seems like the distribution channel model is also a problem here -- as each
   ####record really represents a different number of shipments, But we don't know that at time of application?
 
-  print("Applying shipment size model...")
+  write(paste("group:", g, "Applying shipment size model..."), file=log_file_path, append=TRUE)
   if (nrow(pc[Commodity_SCTG %in% c(1:9)]) > 0) {
     setkeyv(pc, c("Commodity_SCTG", unique(ShipSize_food$VAR[ShipSize_food$TYPE == "Variable"]))) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
     pc_food <-
@@ -833,7 +854,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
     df[, eval(unique(ShipSize_food$VAR[ShipSize_food$TYPE == "Constant"])) :=
          1] #add 1s for constants to each group in df
     setnames(df, "Commodity_SCTG", "CATEGORY")
-    print(paste(nrow(df), "unique combinations"))
+    write(paste("group:", g, nrow(df), "unique combinations"), file=log_file_path, append=TRUE)
     pc[Commodity_SCTG %in% c(1:9), ship_size := predict_logit(df, ShipSize_food, ShipSize_cal, ShipSize_calcats, 4)]
   }
   if (nrow(pc[!Commodity_SCTG %in% c(1:9)]) > 0) {
@@ -846,14 +867,14 @@ create_pmg_inputs <- function(naics, g, sprod) {
     setnames(df, "Commodity_SCTG", "CATEGORY")
     ####do this in the function (seems unecessary here)?
     df[, eval(unique(ShipSize_mfg$VAR[ShipSize_mfg$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-    print(paste(nrow(df), "unique combinations"))
+    write(paste("group:", g, nrow(df), "unique combinations"), file=log_file_path, append=TRUE)
     pc[!Commodity_SCTG %in% c(1:9), ship_size := predict_logit(df, ShipSize_mfg, ShipSize_cal, ShipSize_calcats, 4)]
   }
   rm(df)
 
   #Simulate the actual shipment weight
   # The probabilities are based on data from the CFS and texas
-  print("Simulating the actual shipment weight")
+  write(paste("group:", g, "Simulating the actual shipment weight"), file=log_file_path, append=TRUE)
   pc[, temprand := runif(.N)]
   pc[, weight := 0L]
   #pc[, weight := as.double(weight)]
@@ -899,7 +920,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
   #Each shipper-receiver pair selects one transport & logistics path for its shipping needs based on annual transport & logistics costs
   ## ---------------------------------------------------------------
   ## Heither, revised 07-22-2015
-  print("Applying the mode-path choice model")
+  write(paste("group:", g, "Applying the mode-path choice model"), file=log_file_path, append=TRUE)
   setkey(pc, Production_zone, Consumption_zone)
   pc[, lssbd := ifelse(Seller.Size > 5 &
                          Buyer.Size < 3 & Distance > 300, 1, 0)]
@@ -908,7 +929,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
 
   ## ---------------------------------------------------------------
   ## Heither, revised 02-05-2016: revised so correct modepath is reported
-  df_fin <- minLogisticsCost(pc, 0, naics)
+  df_fin <- minLogisticsCost(pc, 0, naics, g, recycle_check_file_path, log_file_path)
   setnames(df_fin,
            c("time", "path", "minc"),
            c("Attribute2_ShipTime", "MinPath", "MinGmnql"))
@@ -927,7 +948,7 @@ create_pmg_inputs <- function(naics, g, sprod) {
   ## ---------------------------------------------------------------
 
   #Prepare and write the cost file
-  print(paste("Preparing and writing the costs file for", naics))
+  write(paste("group:", g, "Preparing and writing the costs file for", naics), file=log_file_path, append=TRUE)
 
   #save the full table to an rdata file for use after the PMG game
   save(pc, file = file.path(model$outputdir, paste0(naics, "_g", g, ".Rdata")))
@@ -988,14 +1009,14 @@ create_pmg_inputs <- function(naics, g, sprod) {
   rm(pc, prodcg, conscg)
   gc()
 
-  print(paste(
+  write(paste(
     "Complete for",
     naics,
     "group",
     g,
     "in",
     (proc.time() - starttime)[3]
-  ))
+  ), file=log_file_path, append=TRUE)
 }
 
 #save current workspace for use by seperate R script processes for running NAICS groups
