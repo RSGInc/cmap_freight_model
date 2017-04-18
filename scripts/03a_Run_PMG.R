@@ -22,16 +22,16 @@ outputdir <- args[5]
 setwd(basedir)
 
 #Start logging
-PMG_Log <- file.path(outputdir,paste0(naics,"_PMG_Log.txt"))
-log <- file(PMG_Log,open="wt")
-sink(log, split=T)
-sink(log,type="message")
+PMG_Log <- file.path(outputdir, paste0(naics, "_PMG_Log.txt"))
+log <- file(PMG_Log, open = "wt")
+sink(log, split = T)
+sink(log, type = "message")
 
 #load the pmg workspace
-load(file.path(outputdir,"PMG_Workspace.Rdata"))
+load(file.path(outputdir, "PMG_Workspace.Rdata"))
 
 #load the workspace for this naics code
-load(file.path(outputdir,paste0(naics,".Rdata")))
+load(file.path(outputdir, paste0(naics, ".Rdata")))
 
 #load required packages
 library(rFreight, lib.loc = "./library/")
@@ -39,65 +39,189 @@ loadPackage("data.table")
 loadPackage("reshape")
 loadPackage("reshape2")
 loadPackage("bit64")
-options(datatable.auto.index=FALSE)
+options(datatable.auto.index = FALSE)
+##async tools
+##########################################
+useFuture <- TRUE
+debugFuture <- TRUE
+source("./scripts/00_Async_Tasks.R")
+########################################
 
 #list to hold the summarized outputs, file to hold timings
 pmgoutputs <- list()
-pmgtimes <- file(file.path(outputdir,paste0(naics,".txt")),open="wt")
-writeLines(paste("Starting:",naics, "Current time",Sys.time()), con=pmgtimes)
+pmgtimes <-
+  file(file.path(outputdir, paste0(naics, ".txt")), open = "wt")
+writeLines(paste("Starting:", naics, "Current time", Sys.time()), con =
+             pmgtimes)
+
+processPMGOutputs <- function(g) {
+  if (file.exists(file.path(outputdir, paste0(naics, "_g", g, ".out.csv")))) {
+    print(paste(
+      "Processing Outputs:",
+      naics,
+      "Group",
+      g,
+      "Current time",
+      Sys.time()
+    ))
+
+    pmgout <-
+      fread(file.path(outputdir, paste0(naics, "_g", g, ".out.csv")))
+
+    setnames(pmgout, c("BuyerId", "SellerId"), c("BuyerID", "SellerID"))
+
+    #get just the results from the final iteration
+
+    pmgout <- pmgout[Last.Iteration.Quantity > 0]
+
+    #apply fix for bit64/data.table handling of large integers in rbindlist
+
+    pmgout[, Quantity.Traded := as.character(Quantity.Traded)]
+
+    pmgout[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
+
+    load(file.path(outputdir, paste0(naics, "_g", g, ".Rdata")))
+
+    pmgoutputs[[g]] <-
+      merge(pc, pmgout, by = c("BuyerID", "SellerID"))
+
+    rm(pmgout, pc)
+
+
+  }
+} #end processPMGOutputs
 
 #loop over the groups and run the games, and process outputs
-for (g in 1:groups){
+for (g in 1:groups) {
+  if (file.exists(file.path(outputdir, paste0(naics, "_g", g, ".out.csv")))) {
+    processPMGOutputs(g)
+  } else {
+    #output file does not exist so must be calculated
+    #if all processors are in use wait until one is available
+    while ((numTasksRunning <-
+            processRunningTasks(useFuture, debugFuture)) > model$scenvars$maxrscriptinstances) {
+      if (debugFuture)
+        print(
+          paste0(
+            Sys.time(),
+            ": Waiting for some of the ",
+            numTasksRunning,
+            "PMG running tasks to finish so can work on remaining ",
+            ((groups - g) + 1),
+            " tasks. Tasks: ",
+            getRunningTasksStatus()
+          )
+        )
+      Sys.sleep(30)
+    } #end while waiting for free slots
 
-  if(!file.exists(file.path(outputdir,paste0(naics,"_g", g, ".out.csv")))){
-    #call to runPMG to run the game
-    runPMG(naics,g, writelog=model$scenvars$pmglogging, wait=TRUE, inpath=outputdir, outpath=outputdir, logpath=outputdir)
+    taskName <-       paste0("RunPMG_naics-",
+                             naics,
+                             "_group-",
+                             g,
+                             "_of_",
+                             groups,
+                             "_sprod-",
+                             sprod)
+    write(paste0(Sys.time(), ": Starting ", taskName),
+          file = pmgtimes,
+          append = TRUE)
+    startAsyncTask(
+      taskName,
+      future({
+        #call to runPMG to run the game
+        runPMG(
+          naics,
+          g,
+          writelog = model$scenvars$pmglogging,
+          wait = TRUE,
+          inpath = outputdir,
+          outpath = outputdir,
+          logpath = outputdir
+        )
+      }),
+      callback = function(asyncResults) {
+        # asyncResults is: list(asyncTaskName,
+        #                        taskResult,
+        #                        startTime,
+        #                        endTime,
+        #                        elapsedTime,
+        #                        caughtError,
+        #                        caughtWarning)
 
-    if(!model$scenvars$pmglogging) {
-      writeLines(paste("Completed:",naics,"Group",g, "Current time",Sys.time()), con=pmggrouptimes)
-      close(pmggrouptimes)
-    }
 
-    writeLines(paste("Completed:",naics,"Group",g, "Current time",Sys.time()), con=pmgtimes)
 
-    print(paste("Deleting Inputs:",naics,"Group",g, "Current time",Sys.time()))
+        msg <- paste(
+          Sys.time(),
+          "Completed:",
+          asyncResults$asyncTaskName,
+          "Running time:",
+          asyncResults$elapsedTime
+        )
+        if (!model$scenvars$pmglogging) {
+          writeLines(msg,
+                     con = pmggrouptimes)
+          close(pmggrouptimes)
+        }
 
-    file.remove(file.path(outputdir,paste0(naics,"_g", g, ".costs.csv")))
-    file.remove(file.path(outputdir,paste0(naics,"_g", g, ".buy.csv")))
-    file.remove(file.path(outputdir,paste0(naics,"_g", g, ".sell.csv")))
+        writeLines(msg,
+                   con = pmgtimes)
 
-  }
+        print(paste(
+          "Deleting Inputs:",
+          naics,
+          "Group",
+          g,
+          "Current time",
+          Sys.time()
+        ))
 
-  if (file.exists(file.path(outputdir,paste0(naics,"_g", g, ".out.csv")))){
-    print(paste("Processing Outputs:",naics,"Group",g, "Current time",Sys.time()))
-    pmgout <- fread(file.path(outputdir,paste0(naics,"_g", g,".out.csv")))
-    setnames(pmgout,c("BuyerId","SellerId"),c("BuyerID","SellerID"))
-    #get just the results from the final iteration
-    pmgout <- pmgout[Last.Iteration.Quantity>0]
-    #apply fix for bit64/data.table handling of large integers in rbindlist
-    pmgout[,Quantity.Traded:=as.character(Quantity.Traded)]
-    pmgout[,Last.Iteration.Quantity:=as.character(Last.Iteration.Quantity)]
-    load(file.path(outputdir,paste0(naics,"_g", g,".Rdata")))
-    pmgoutputs[[g]] <- merge(pc,pmgout,by=c("BuyerID","SellerID"))
-    rm(pmgout,pc)
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
 
-  }
+        processPMGOutputs(g)
 
-}
+      } #end callback
+    ) #end call to startAsyncTask
+  } #end if file does not exist already
+}#end loop over groups
+
+#loop until all running tasks are finished
+while ((numTasksRunning <-
+        processRunningTasks(useFuture, debugFuture)) > 0) {
+  if (debugFuture)
+    print(
+      paste0(
+        Sys.time(),
+        ": Waiting for final ",
+        numTasksRunning,
+        "PMG running tasks to finish. ",
+        getRunningTasksStatus()
+      )
+    )
+  Sys.sleep(30)
+} #end while waiting for free slots
 
 #convert output list to one table, add to workspace, and save
 #apply fix for bit64/data.table handling of large integers in rbindlist
 pairs <- rbindlist(pmgoutputs)
 rm(pmgoutputs)
-pairs[,Quantity.Traded:=as.integer64.character(Quantity.Traded)]
-pairs[,Last.Iteration.Quantity:=as.integer64.character(Last.Iteration.Quantity)]
-save(consc,prodc,pairs,file=file.path(outputdir,paste0(naics,".Rdata")))
+pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
+pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
+save(consc, prodc, pairs, file = file.path(outputdir, paste0(naics, ".Rdata")))
 
 #close off logging
-writeLines(paste("Completed Processing Outputs:",naics, "Current time",Sys.time()), con=pmgtimes)
+writeLines(paste(
+  "Completed Processing Outputs:",
+  naics,
+  "Current time",
+  Sys.time()
+),
+con = pmgtimes)
 close(pmgtimes)
 
 #end sinking
-sink(type="message")
+sink(type = "message")
 sink()
 quit(save = "no", status = 0)

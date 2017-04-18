@@ -96,11 +96,12 @@ HighVariability     <- 0.09
 #---------------------------------------------------------------------
 
 # max number of R script instances to run at once for determining Supplier to Buyer costs (1 for monitoring if that is run)
-maxcostrscripts <- 8
+maxcostrscripts <- min(8, max(1, future::availableCores()-1))
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
 #maxrscriptinstances <- 32
-maxrscriptinstances <- 8
+maxrscriptinstances <- maxcostrscripts
+
 
 # should monitoring be run?
 pmgmonitoring <- TRUE
