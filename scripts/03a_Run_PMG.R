@@ -1,7 +1,7 @@
 ##############################################################################################
 #Title:             CMAP Agent Based Freight Forecasting Code
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
-#Description:       03a_RunPMG.R produces the inputs and runs the PMG games for a NAICS code                   
+#Description:       03a_RunPMG.R produces the inputs and runs the PMG games for a NAICS code
 #Date:              June 26 28, 2014
 #Author:            Resource Systems Group, Inc.
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
@@ -23,13 +23,13 @@ setwd(basedir)
 
 #Start logging
 PMG_Log <- file.path(outputdir,paste0(naics,"_PMG_Log.txt"))
-log <- file(PMG_Log,open="wt") 
+log <- file(PMG_Log,open="wt")
 sink(log, split=T)
 sink(log,type="message")
 
 #load the pmg workspace
 load(file.path(outputdir,"PMG_Workspace.Rdata"))
-     
+
 #load the workspace for this naics code
 load(file.path(outputdir,paste0(naics,".Rdata")))
 
@@ -38,17 +38,17 @@ library(rFreight, lib.loc = "./library/")
 loadPackage("data.table")
 loadPackage("reshape")
 loadPackage("reshape2")
-loadPackage("bit64")  
+loadPackage("bit64")
 options(datatable.auto.index=FALSE)
 
 #list to hold the summarized outputs, file to hold timings
-pmgoutputs <- list() 
+pmgoutputs <- list()
 pmgtimes <- file(file.path(outputdir,paste0(naics,".txt")),open="wt")
 writeLines(paste("Starting:",naics, "Current time",Sys.time()), con=pmgtimes)
 
 #loop over the groups and run the games, and process outputs
 for (g in 1:groups){
-  
+
   if(!file.exists(file.path(outputdir,paste0(naics,"_g", g, ".out.csv")))){
     #call to runPMG to run the game
     runPMG(naics,g, writelog=model$scenvars$pmglogging, wait=TRUE, inpath=outputdir, outpath=outputdir, logpath=outputdir)
@@ -57,17 +57,17 @@ for (g in 1:groups){
       writeLines(paste("Completed:",naics,"Group",g, "Current time",Sys.time()), con=pmggrouptimes)
       close(pmggrouptimes)
     }
-        
+
     writeLines(paste("Completed:",naics,"Group",g, "Current time",Sys.time()), con=pmgtimes)
-      
+
     print(paste("Deleting Inputs:",naics,"Group",g, "Current time",Sys.time()))
-    
+
     file.remove(file.path(outputdir,paste0(naics,"_g", g, ".costs.csv")))
     file.remove(file.path(outputdir,paste0(naics,"_g", g, ".buy.csv")))
     file.remove(file.path(outputdir,paste0(naics,"_g", g, ".sell.csv")))
-    
-  } 
-  
+
+  }
+
   if (file.exists(file.path(outputdir,paste0(naics,"_g", g, ".out.csv")))){
     print(paste("Processing Outputs:",naics,"Group",g, "Current time",Sys.time()))
     pmgout <- fread(file.path(outputdir,paste0(naics,"_g", g,".out.csv")))
@@ -80,9 +80,9 @@ for (g in 1:groups){
     load(file.path(outputdir,paste0(naics,"_g", g,".Rdata")))
     pmgoutputs[[g]] <- merge(pc,pmgout,by=c("BuyerID","SellerID"))
     rm(pmgout,pc)
-    
-  } 
-    
+
+  }
+
 }
 
 #convert output list to one table, add to workspace, and save
@@ -100,4 +100,4 @@ close(pmgtimes)
 #end sinking
 sink(type="message")
 sink()
-
+quit(save = FALSE, status = 0)

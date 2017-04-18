@@ -124,7 +124,12 @@ progressManager(
 
 #lapply(model$stepscripts,source)
 
-source("./scripts/00_Utilities.R") #defines isPeterDevelopmentMode
+isPeterDevelopmentMode <-
+  dir.exists(model$outputdir) &&
+  (length(list.files(model$outputdir)) > 10) &&
+  interactive() &&
+  (Sys.info()[["user"]] == "peter.andrews")
+
 
 if (isPeterDevelopmentMode && exists("ineligible")) {
   print("NOTICE -- skipping steps 1 & 2 because in isPeterDevelopmentMode")
@@ -138,7 +143,9 @@ source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
 if (isPeterDevelopmentMode) {
   print("NOTICE -- skipping steps 5:11 because in isPeterDevelopmentMode")
 } else {
-  source(model$stepscripts[5:11]) #Truck Touring Model
+  for (scriptNumber in 5:11) {
+    source(model$stepscripts[scriptNumber]) #Truck Touring Model
+  }
 }
 
 
