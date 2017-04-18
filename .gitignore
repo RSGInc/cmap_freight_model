@@ -4,5 +4,5 @@
 .Ruserdata
 .library
 library
-scenarios/base/outputs
+scenarios/base/outputs*
 RunTimes.csv
