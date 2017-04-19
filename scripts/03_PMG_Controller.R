@@ -44,6 +44,7 @@ while (naicscostrun <= naicstorun) {
 }
 
 
+
 ### --------------------------------
 progressNextStep("Running PMGs")
 
@@ -52,27 +53,6 @@ load(file.path(model$outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 naicstorun <- nrow(naics_set)
-
-# have all of the input files been prepared? Don't proceed until they have...
-costs_files <-
-  paste0(rep(naics_set$NAICS, times = naics_set$groups),
-         "_g",
-         unlist(lapply(naics_set$groups, seq)),
-         ".costs.csv")
-
-while (!all(file.exists(file.path(model$outputdir, costs_files)))) {
-  print(paste0(
-    collapse = ", ",
-    file.path(model$outputdir, costs_files),
-    " exists?: ",
-    file.exists(file.path(model$outputdir, costs_files))
-  ))
-  print(paste(
-    "Waiting for PMG Inputs Files to be Prepared: Current time",
-    Sys.time()
-  ))
-  Sys.sleep(30)
-}
 
 #Call the writePMGini function to write out the variables above to the PMG ini file at run time
 writePMGini(model$scenvars, "./PMG/PMG.ini")

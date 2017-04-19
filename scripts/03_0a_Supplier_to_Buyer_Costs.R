@@ -175,6 +175,11 @@ for (g in 1:groups) {
         file = baseLogFilePath,
         append = TRUE
       )
+      #check that cost files was create
+      costs_file_path <- file.path(model$outputdir,paste0(naics, "_g", g, ".costs.csv"))
+      if (!file.exists(costs_file_path)) {
+        stop(paste("***ERROR*** Did not find expected costs file '", costs_file_path, "'."))
+      }
     },
     debug = debugFuture
   ) #end call to startAsyncTask
