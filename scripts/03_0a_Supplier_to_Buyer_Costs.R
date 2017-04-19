@@ -116,12 +116,12 @@ for (g in 1:groups) {
       }
 
       if (!file.exists(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))) {
-        msg <- paste("Starting:",
+        msg <- print(paste("Starting:",
                      naics,
                      "Group",
                      g,
                      "Current time",
-                     Sys.time())
+                     Sys.time()))
         write(msg, file = log_file_path, append = TRUE)
 
         msg <- print(paste(
@@ -164,20 +164,22 @@ for (g in 1:groups) {
       #                        elapsedTime,
       #                        caughtError,
       #                        caughtWarning)
-      write(
+      #check that cost files was create
+      costs_file_path <- file.path(model$outputdir,paste0(naics, "_g", g, ".costs.csv"))
+      cost_file_exists <- file.exists(costs_file_path)
+      write(print(
         paste0(
           Sys.time(),
           ": Finished ",
           asyncResults[["asyncTaskName"]],
-          "Running time:",
-          asyncResults[["elapsedTime"]]
-        ),
-        file = baseLogFilePath,
-        append = TRUE
-      )
-      #check that cost files was create
-      costs_file_path <- file.path(model$outputdir,paste0(naics, "_g", g, ".costs.csv"))
-      if (!file.exists(costs_file_path)) {
+          ", Running time: ",
+          asyncResults[["elapsedTime"]],
+          ", cost_file_exists: ", cost_file_exists
+        )
+      ),
+      file = baseLogFilePath,
+      append = TRUE)
+      if (!cost_file_exists) {
         stop(paste("***ERROR*** Did not find expected costs file '", costs_file_path, "'."))
       }
     },

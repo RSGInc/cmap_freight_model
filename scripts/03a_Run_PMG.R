@@ -251,15 +251,7 @@ processPMGOutputs <- function(g, log_file_path = NULL) {
     pmgout <-
       fread(file.path(outputdir, paste0(naics, "_g", g, ".out.csv")))
 
-    if (!is.null(log_file_path))
-      write(print(paste0("names(pmgout): ", paste0(collapse=", ", names(pmgout)))),
-            file = log_file_path, append = TRUE)
     setnames(pmgout, c("BuyerId", "SellerId"), c("BuyerID", "SellerID"))
-    if (!is.null(log_file_path))
-      if (!is.null(log_file_path))
-        write(print(paste0(
-          "AFTER setnames names(pmgout): ", paste0(collapse=", ", names(pmgout))
-        )), file = log_file_path, append = TRUE)
 
     #get just the results from the final iteration
 
@@ -277,9 +269,6 @@ processPMGOutputs <- function(g, log_file_path = NULL) {
       merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
     rm(pmgout, pc)
-    if (!is.null(log_file_path))
-      write(print("FINISHED processPMGOutputs when output exists "),
-            file = log_file_path, append = TRUE)
   }
   return(doOutputsExist)
 } #end processPMGOutputs

@@ -19,16 +19,14 @@ progressStart(pmgcon, 3)
 #------------------------------------------------------------------------------------------------------
 progressNextStep("Producing Supplier to Buyer Costs")
 
-naicscostrun <- 1L #counter
 load(file.path(model$outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
-naicstorun <- nrow(naics_set)
 
-while (naicscostrun <= naicstorun) {
-  naics <- naics_set$NAICS[naicscostrun]
-  groups <- naics_set$groups[naicscostrun]
-  sprod <- ifelse(naics_set$Split_Prod[naicscostrun], 1, 0)
+for (naics_run_number in 1:nrow(naics_set)) {
+  naics <- naics_set$NAICS[naics_run_number]
+  groups <- naics_set$groups[naics_run_number]
+  sprod <- ifelse(naics_set$Split_Prod[naics_run_number], 1, 0)
   rScriptCmd <-
     paste(
       "Rscript .\\scripts\\03_0a_Supplier_to_Buyer_Costs.R",
@@ -38,21 +36,19 @@ while (naicscostrun <= naicstorun) {
       model$basedir,
       model$outputdir
     )
-  system(rScriptCmd, wait = TRUE)
   print(paste("Starting:", naics))
-  naicscostrun <- naicscostrun + 1L
-}
-
-
+  exitStatus <- system(rScriptCmd, wait = TRUE)
+  if (exitStatus != 0) {
+    stop(paste0("ERROR exitStatus: ", exitStatus, " when running '", rScriptCmd, "'"))
+  }
+} #end for (naics_run_number in 1:nrow(naics_set))
 
 ### --------------------------------
 progressNextStep("Running PMGs")
 
-naicsrun <- 1L #counter
 load(file.path(model$outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
-naicstorun <- nrow(naics_set)
 
 #Call the writePMGini function to write out the variables above to the PMG ini file at run time
 writePMGini(model$scenvars, "./PMG/PMG.ini")
@@ -68,10 +64,10 @@ if (model$scenvars$pmgmonitoring)
     wait = FALSE
   )
 
-while (naicsrun <= naicstorun) {
-  naics <- naics_set$NAICS[naicsrun]
-  groups <- naics_set$groups[naicsrun]
-  sprod <- ifelse(naics_set$Split_Prod[naicsrun], 1, 0)
+for (naics_run_number in 1:nrow(naics_set)) {
+  naics <- naics_set$NAICS[naics_run_number]
+  groups <- naics_set$groups[naics_run_number]
+  sprod <- ifelse(naics_set$Split_Prod[naics_run_number], 1, 0)
   rScriptCmd <-
     paste(
       "Rscript .\\scripts\\03a_Run_PMG.R",
@@ -81,11 +77,11 @@ while (naicsrun <= naicstorun) {
       model$basedir,
       model$outputdir
     )
-  system(rScriptCmd, wait = TRUE)
   print(paste("Starting:", naics))
-  naicsrun <- naicsrun + 1L
-} #end while (naicsrun <= naicstorun)
-
-
+  exitStatus <- system(rScriptCmd, wait = TRUE)
+  if (exitStatus != 0) {
+    stop(paste0("ERROR exitStatus: ", exitStatus, " when running '", rScriptCmd, "'"))
+  }
+} #end for (naics_run_number in 1:nrow(naics_set))
 
 pmgcon <- progressEnd(pmgcon)
