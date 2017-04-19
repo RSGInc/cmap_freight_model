@@ -69,7 +69,7 @@ write(
 )
 #check whether sampling within the group has been done and if not run that function
 if (!"group" %in% names(prodc))
-  create_pmg_sample_groups(naics, groups, sprod, baseLogFilePath)
+  create_pmg_sample_groups(naics, groups, sprod)
 
 
 
@@ -109,9 +109,6 @@ for (g in 1:groups) {
   startAsyncTask(
     taskName,
     future({
-      # model$Current_Commodity <-
-      #   naics		## Heither, 12-01-2015: store current NAICS value
-
       ## Heither, revised 10-05-2015: File Cleanup if Outputs folder being re-used from previous run
       ## -- Delete NAICS_gX.sell file if exists from prior run (existence will prevent create_pmg_inputs from running)
       if (file.exists(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))) {
@@ -148,7 +145,7 @@ for (g in 1:groups) {
             )
           )
         file.create(recycle_check_file_path)
-        create_pmg_inputs(naics, g, sprod, recycle_check_file_path, log_file_path)
+        create_pmg_inputs(naics, g, sprod, recycle_check_file_path)
 
         if (!model$scenvars$pmglogging) {
           pmggrouptimes <-

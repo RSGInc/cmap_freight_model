@@ -138,7 +138,7 @@ pair2[,c("Active","Attribute2_ShipTime","MinPath","MinGmnql"):=NULL]
 setkey(pair2,Production_zone,Consumption_zone)
 
 ### Calculate Domestic Linehaul-to-Port Mode
-df_fin <- minLogisticsCost(pair2,1, recycle_check_file_path)
+df_fin <- minLogisticsCost(pair2,1, "NAICS_PALCEHOLDER", recycle_check_file_path)
 setnames(df_fin,c("time","path","minc"),c("Attribute2_ShipTime","MinPath","MinGmnql"))
 setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG)
 setkey(pair2,SellerID,BuyerID,NAICS,Commodity_SCTG)

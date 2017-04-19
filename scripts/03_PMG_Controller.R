@@ -19,15 +19,6 @@ progressStart(pmgcon, 3)
 #------------------------------------------------------------------------------------------------------
 progressNextStep("Producing Supplier to Buyer Costs")
 
-## ---------------------------------------------------------------
-## Heither, revised 12-01-2015: Add file to hold initial (PMG setup) SCTG recycling check data
-model$recycle_check <-
-  file.path(model$outputdir, "recycle_check_initial.txt")
-if (file.exists(model$recycle_check)) {
-  file.remove(model$recycle_check)
-}
-## ---------------------------------------------------------------
-
 naicscostrun <- 1L #counter
 load(file.path(model$outputdir, "naics_set.Rdata"))
 naics_set <-

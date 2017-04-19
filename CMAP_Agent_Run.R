@@ -8,13 +8,24 @@
 ##############################################################################################
 
 #1.Set the base directory (the directory in which the model resides)
-#use 'here' to determine project root.
-#devtools install will skip install if latest version already installed
-suppressMessages(devtools::install_github("krlmlr/here"))
-#basedir <- "E:/cmh/Meso_Freight_PMG_Base_Test_Setup"
-basedir <- here::here()
+library(envDocument)
+scriptpath <- envDocument::get_scriptpath()
 
-#2. Set the scnario to run -- same as the folder name inside the scenarios directory
+if (is.null(scriptpath) || is.na(scriptpath)) {
+  warning(
+    "Can not find path of script so must assume that the working directory is set to the project root"
+  )
+  basedir <- getwd()
+} else {
+  scriptDir <- dirname(scriptpath)
+  basedir <-
+    scriptDir #basedir is the root of the github repo -- which this script is in
+}
+print(paste0("basedir: ", basedir))
+#there is code, such as source statments that assume the working directory is set to base
+setwd(basedir)
+
+#2. Set the scenario to run -- same as the folder name inside the scenarios directory
 scenario <- "base"
 
 #3. Run the model
