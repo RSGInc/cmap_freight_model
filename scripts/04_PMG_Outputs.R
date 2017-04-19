@@ -25,12 +25,16 @@ naics_set <- subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 naicstorun <- nrow(naics_set)
 naicspairs <- list() #list to hold the summarized outputs
 
+debug <- TRUE
 while (naicsrun <= naicstorun){
 
   #check if the next naics market is ready
-  if (file.exists(file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],".txt")))){
+  naicsLogPath <-file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],".txt"))
+  fileExists <- file.exists(naicsLogPath)
+  if (debug) print(paste("naicsLogPath:", naicsLogPath, "fileExists:", fileExists, "file.size:", file.size(naicsLogPath)))
+  if (fileExists) {
 
-    naicslog <- readLines(file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],".txt")))
+    naicslog <- readLines(naicsLogPath)
 
     if(length(naicslog)>0){
 
@@ -77,10 +81,8 @@ if(nrow(bad1)>0)  {write.csv(bad1,file=model$bad_modes,row.names=FALSE)}
 
 ## ---------------------------------------------------------------
 
-model$recycle_check <- file.path(model$outputdir,"recycle_check_final.txt")
-if(file.exists(model$recycle_check)){
-	file.remove(model$recycle_check)
-  }
+recycle_check_file_path <- file.path(model$outputdir,"recycle_check_final.txt")
+file.create(recycle_check_file_path) #will create or truncate
 
 ## ---------------------------------------------------------------
 ## add code for shipments b/n zone and port (create input file first)
@@ -136,7 +138,7 @@ pair2[,c("Active","Attribute2_ShipTime","MinPath","MinGmnql"):=NULL]
 setkey(pair2,Production_zone,Consumption_zone)
 
 ### Calculate Domestic Linehaul-to-Port Mode
-df_fin <- minLogisticsCost(pair2,1)
+df_fin <- minLogisticsCost(pair2,1, recycle_check_file_path)
 setnames(df_fin,c("time","path","minc"),c("Attribute2_ShipTime","MinPath","MinGmnql"))
 setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG)
 setkey(pair2,SellerID,BuyerID,NAICS,Commodity_SCTG)

@@ -273,10 +273,8 @@ calcLogisticsCost <- function(dfspi, s, path) {
 ## Heither, revised 11-06-2015: revised mode exclusion logic due to new indirect truck modes for non-CMAP US shipments
 ## Heither, revised 11-24-2015: revised to include recycling check file
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [keep NAICS/Commodity_SCTG, return as stand-alone data.table]
-minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics, group, recycle_check_file_path, log_file_path) {
-  #write(paste(1,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
+minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics, recycle_check_file_path) {
   s <- sctg[iSCTG]
-  #write(paste(2,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp <-
     merge(dfsp, cskims[, c(
       "Production_zone",
@@ -285,7 +283,6 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics, group, recycle_
       paste0("cost", paths)
     ), with = F])
   numrows <- nrow(dfsp)
-  #write(paste(3,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp <-
     cbind(
       melt(
@@ -313,12 +310,9 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics, group, recycle_
         value.name = "cost"
       )
     )
-  #write(paste(4,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp[, path := as.numeric(unlist(lapply(paths, rep, numrows)))]   ## store numeric path value; as.numeric to stop warning about int-num mismatch between dfsp & pc (Heither, 11-06-2015)
-  #write(paste(5,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp[, minc := unlist(lapply(paths, function(x)
     calcLogisticsCost(dfsp[path == x, list(PurchaseAmountTons, weight, ConVal, lssbd, time, cost)], s, x)))]
-  #write(paste(6,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   ## variables from model$scenvars
   CAP1Carload  <-
     model$scenvars$CAP1Carload    #Capacity of 1 Full Railcar
@@ -327,7 +321,6 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics, group, recycle_
   CAP1Airplane <-
     model$scenvars$CAP1Airplane	#Capacity of 1 Airplane Cargo Hold
 
-  #write(paste(7,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   dfsp[, avail := TRUE]
   dfsp[path %in% 1:12 &
          weight < CAP1Carload, avail := FALSE] #Eliminate Water and Carload from choice set if Shipment Size < 1 Rail Carload
@@ -351,34 +344,25 @@ minLogisticsCostSctgPaths <- function(dfsp, iSCTG, paths, naics, group, recycle_
   dfsp <-
     dfsp[, list(SellerID, BuyerID, NAICS, Commodity_SCTG, time, path, minc)]
 
-  #write(paste(8,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   ###if(file.exists("E:/cmh/mode_check0.txt")){
   ###write.table(dfsp, file="E:/cmh/mode_check0.txt", row.names=F, col.names=F, append=TRUE, sep=",")
   ###} else {write.table(dfsp, file="E:/cmh/mode_check0.txt", row.names=F, sep=",")}
   numrows2 <- nrow(dfsp)
-  #write(paste(9,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
-
-  #write(paste(10,"minLogisticsCostSctgPaths group:",group, "naics:", naics, "recycle_check_file_path:",recycle_check_file_path), file=log_file_path, append=TRUE)
   x_write = c(naics, iSCTG, numrows, numrows2, length(paths))
-  #write(paste(11,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   write(x_write,
         recycle_check_file_path,
         ncolumns = length(x_write),
         append = TRUE)
-  #write(paste(12,"minLogisticsCostSctgPaths group:",group, "naics:", naics), file=log_file_path, append=TRUE)
   return(dfsp)
 }
 
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [return stand-alone data.table]
-minLogisticsCost <- function(df, runmode, naics, group, recycle_check_file_path, log_file_path) {
+minLogisticsCost <- function(df, runmode, naics, recycle_check_file_path) {
   pass <- 0			### counter for number of passes through function
-  #write(paste(1, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
   for (iSCTG in unique(df$Commodity_SCTG)) {
-    write(paste("group:",group, "iSCTG: ", iSCTG), file=log_file_path, append=TRUE)
 
     ###### Heither, 02-09-2016: Runmode==0 - use for initial cost file development and shipper select best mode --
     if (runmode == 0)	{
-      #write(paste(2, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       #Direct (Limited to US Domestic) and anything within CMAP region (even if flagged as indirect): 4 direct mode-paths in the direct path choiceset: c(3,13,31,46)
       ### -- Heither, 10-15-2015: Selection Logic simplified due to enforcing Distribution channel logical consistency above -- ###
       ###df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG,c("MinGmnql","MinPath","Attribute2_ShipTime"):=minLogisticsCostSctgPaths(df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG],iSCTG,c(3,13,31,46), naics)]
@@ -387,9 +371,7 @@ minLogisticsCost <- function(df, runmode, naics, group, recycle_check_file_path,
         df[(distchannel == 1 |
               (Production_zone < 151 &
                  Consumption_zone < 151)) & Commodity_SCTG == iSCTG]
-      #write(paste(3, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
-      df2 <- minLogisticsCostSctgPaths(df1, iSCTG, c(3, 13, 31, 46), naics, group, recycle_check_file_path, log_file_path)
-      #write(paste(4, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
+      df2 <- minLogisticsCostSctgPaths(df1, iSCTG, c(3, 13, 31, 46), naics, recycle_check_file_path)
       if (nrow(df2) > 0) {
         if (pass == 0) {
           df_out <-
@@ -399,7 +381,6 @@ minLogisticsCost <- function(df, runmode, naics, group, recycle_check_file_path,
           df_out <- rbind(df_out, df2)
         }
       }
-      #write(paste(5, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
 
       #Indirect and International: 50 indirect mode-paths in the path choiceset: c(1:2,4:12,14:30,32:45,47:54)
       ###df[distchannel>1 & (Production_zone>150 | Consumption_zone>150) & Commodity_SCTG==iSCTG,c("MinGmnql","MinPath","Attribute2_ShipTime"):=minLogisticsCostSctgPaths(df[distchannel>1 & (Production_zone>150 | Consumption_zone>150) & Commodity_SCTG==iSCTG],iSCTG,c(1:2,4:12,14:30,32:45,47:54), naics)]
@@ -408,9 +389,8 @@ minLogisticsCost <- function(df, runmode, naics, group, recycle_check_file_path,
         df[distchannel > 1 &
              (Production_zone > 150 |
                 Consumption_zone > 150) & Commodity_SCTG == iSCTG]
-      #write(paste(5, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       df2 <-
-        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45, 47:54), naics, group, recycle_check_file_path, log_file_path)
+        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45, 47:54), naics, recycle_check_file_path)
       if (nrow(df2) > 0) {
         if (pass == 0) {
           df_out <- copy(df2)
@@ -419,15 +399,11 @@ minLogisticsCost <- function(df, runmode, naics, group, recycle_check_file_path,
           df_out <- rbind(df_out, df2)
         }
       }
-      #write(paste(6, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
     } else {
-      #write(paste(7, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       ###### Heither, 02-09-2016: Runmode!=0 - use for shipments between domestic zone and domestic port --
       df1 <- df[Commodity_SCTG == iSCTG]
-      #write(paste(8, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
       df2 <-
-        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45), naics, group, recycle_check_file_path, log_file_path)			## include inland water - 03-06-2017
-      #write(paste(9, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
+        minLogisticsCostSctgPaths(df1, iSCTG, c(1:2, 4:12, 14:30, 32:45), naics, recycle_check_file_path)			## include inland water - 03-06-2017
       if (nrow(df2) > 0) {
         if (pass == 0) {
           df_out <- copy(df2)
@@ -436,10 +412,8 @@ minLogisticsCost <- function(df, runmode, naics, group, recycle_check_file_path,
           df_out <- rbind(df_out, df2)
         }
       }
-      #write(paste(10, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
     }
   }
-  #write(paste(11, "minLogisticsCost group:",group, "runmode: ", runmode, "naics:", naics), file=log_file_path, append=TRUE)
   ##### Heither, 02-05-2016: Following line for debugging only
   #####write.table(df_out, file="E:/cmh/mode_check1.txt", row.names=F, sep=",")
   return(df_out)
@@ -929,7 +903,7 @@ create_pmg_inputs <- function(naics, g, sprod, recycle_check_file_path, log_file
 
   ## ---------------------------------------------------------------
   ## Heither, revised 02-05-2016: revised so correct modepath is reported
-  df_fin <- minLogisticsCost(pc, 0, naics, g, recycle_check_file_path, log_file_path)
+  df_fin <- minLogisticsCost(pc, 0, naics, g, recycle_check_file_path)
   setnames(df_fin,
            c("time", "path", "minc"),
            c("Attribute2_ShipTime", "MinPath", "MinGmnql"))

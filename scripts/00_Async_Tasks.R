@@ -98,43 +98,46 @@ checkAsyncTasksRunning <- function(catchErrors = TRUE, debug=FALSE, maximumTasks
     asyncTaskObject <- asyncTasksRunning[[asyncTaskName]]
     asyncFutureObject <- asyncTaskObject$futureObj
     if (resolved(asyncFutureObject)) {
+      taskResult <- NULL
       numTasksResolved <- numTasksResolved + 1
        #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
       caughtError <- NULL
       caughtWarning <- NULL
       if (catchErrors) {
-      tryCatch(
+        withCallingHandlers(
         expr = {
-          taskResult <<- value(asyncFutureObject)
+          taskResult <- value(asyncFutureObject)
         },
         warning = function(w) {
           caughtWarning <- w
           debugConsole(
             paste0(
-              "checkAsyncTasksRunning: '",
+              "***WARNING*** checkAsyncTasksRunning: '",
               asyncTaskName,
               "' returned a warning: ",
               w
             )
           )
+          print(sys.calls())
         },
         error = function(e) {
           caughtError <- e
           debugConsole(
             paste0(
-              "checkAsyncTasksRunning: '",
+              "***ERROR*** checkAsyncTasksRunning: '",
               asyncTaskName,
               "' returned an error: ",
               e
             )
           )
+          print(sys.calls())
         }
       )#end tryCatch
       } #end if catch errors
       else {
         #simply fetch the value -- if exceptions happened they will be thrown by the Future library when we call value and
         #therefore will propagate to the caller
-        taskResult <<- value(asyncFutureObject)
+        taskResult <- value(asyncFutureObject)
       }
       startTime <- asyncTaskObject$startTime
       endTime <- Sys.time()

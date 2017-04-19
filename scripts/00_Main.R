@@ -3,7 +3,7 @@
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
 #Description:       00_Main.R controls the model flow and sources in other scripts to run
 #                   components of the model. The code as whole implements the national supply
-#                   chain freight framework, which is bassed on earlier work for FHWA carried
+#                   chain freight framework, which is based on earlier work for FHWA carried
 #                   out by RSG
 #Date:              January 28, 2014
 #Author:            Resource Systems Group, Inc.

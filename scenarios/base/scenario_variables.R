@@ -107,7 +107,7 @@ maxrscriptinstances <- maxcostrscripts
 pmgmonitoring <- TRUE
 
 pmgnaicstorun <- c(
-  336414, 326220, 212230,332420
+  326220 #, 212230,336414, 332420
 )
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
