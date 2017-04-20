@@ -117,6 +117,7 @@ rm(basedir, scenario, steps, steptitles, stepscripts)
 #Load file paths to model inputs, outputs, and workspaces
 source("./scripts/00_File_Locations.R")
 
+print(paste0("maxrscriptinstances: ", model$scenvars$maxrscriptinstances))
 
 #-----------------------------------------------------------------------------------
 #Run model steps

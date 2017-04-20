@@ -229,8 +229,10 @@ runPMGLocal <-
 pmgoutputs <- list()
 pmgtimes <-
   file(file.path(outputdir, paste0(naics, ".txt")), open = "wt")
-writeLines(print(paste("Starting:", naics, "Current time", Sys.time())), con =
-             pmgtimes)
+writeLines(print(paste(
+  "Starting:", naics, "Current time", Sys.time()
+)), con =
+  pmgtimes)
 
 processPMGOutputs <- function(g, log_file_path = NULL) {
   doOutputsExist <-
@@ -278,8 +280,9 @@ for (g in 1:groups) {
   if (!processPMGOutputs(g, pmgtimes)) {
     #output file does not exist so must be calculated
     #if all processors are in use wait until one is available
-    while ((numTasksRunning <-
-            processRunningTasks(useFuture, debugFuture)) > model$scenvars$maxrscriptinstances) {
+    repeat {
+      numTasksRunning <-
+        processRunningTasks(useFuture, debugFuture)
       if (debugFuture)
         print(
           paste0(
@@ -292,7 +295,11 @@ for (g in 1:groups) {
             getRunningTasksStatus()
           )
         )
-      Sys.sleep(30)
+      if (numTasksRunning < model$scenvars$maxrscriptinstances) {
+        break
+      } else {
+        Sys.sleep(30)
+      }
     } #end while waiting for free slots
 
     taskName <-       paste0("RunPMG_naics-",
@@ -409,8 +416,9 @@ for (g in 1:groups) {
 }#end loop over groups
 
 #loop until all running tasks are finished
-while ((numTasksRunning <-
-        processRunningTasks(useFuture, debugFuture)) > 0) {
+repeat {
+  numTasksRunning <-
+    processRunningTasks(useFuture, debugFuture)
   if (debugFuture)
     print(
       paste0(
@@ -421,69 +429,55 @@ while ((numTasksRunning <-
         getRunningTasksStatus()
       )
     )
-  Sys.sleep(30)
-} #end while waiting for free slots
+  if (numTasksRunning < model$scenvars$maxrscriptinstances) {
+    break
+  } else {
+    Sys.sleep(30)
+  }
+} #end while waiting for all tasks to finish
 
 if (debugFuture)
-  print(
-    paste0(
-      Sys.time(),
-      ": 1 run_PMG"
-    )
-  )
+  print(paste0(Sys.time(),
+               ": 1 run_PMG"))
 #convert output list to one table, add to workspace, and save
 #apply fix for bit64/data.table handling of large integers in rbindlist
 pairs <- rbindlist(pmgoutputs)
 if (debugFuture)
-  print(
-    paste0(
-      Sys.time(),
-      ": 2 run_PMG", "names(pairs):", paste0(collapse=", ", names(pairs))
-    )
-  )
+  print(paste0(
+    Sys.time(),
+    ": 2 run_PMG",
+    "names(pairs):",
+    paste0(collapse = ", ", names(pairs))
+  ))
 rm(pmgoutputs)
 pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 if (debugFuture)
-  print(
-    paste0(
-      Sys.time(),
-      ": 3 run_PMG"
-    )
-  )
+  print(paste0(Sys.time(),
+               ": 3 run_PMG"))
 
 pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
 if (debugFuture)
-  print(
-    paste0(
-      Sys.time(),
-      ": 4 run_PMG"
-    )
-  )
+  print(paste0(Sys.time(),
+               ": 4 run_PMG"))
 save(consc, prodc, pairs, file = file.path(outputdir, paste0(naics, ".Rdata")))
 if (debugFuture)
-  print(
-    paste0(
-      Sys.time(),
-      ": 5 run_PMG"
-    )
-  )
+  print(paste0(Sys.time(),
+               ": 5 run_PMG"))
 
 #close off logging
-writeLines(print(paste(
-  "Completed Processing Outputs:",
-  naics,
-  "Current time",
-  Sys.time()
-)),
+writeLines(print(
+  paste(
+    "Completed Processing Outputs:",
+    naics,
+    "Current time",
+    Sys.time()
+  )
+),
 con = pmgtimes)
 close(pmgtimes)
 if (debugFuture)
-  print(
-    paste0(
-      Sys.time(),
-      ":  run_PMG"
-    )
-  )
+  print(paste0(Sys.time(),
+               ":  run_PMG"))
 
 #end sinking
 sink(type = "message")

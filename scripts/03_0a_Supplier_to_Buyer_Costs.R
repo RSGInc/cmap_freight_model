@@ -77,8 +77,9 @@ if (!"group" %in% names(prodc))
 for (g in 1:groups) {
   log_file_path <- getNewLogFilePath(g)
   #if all processors are in use wait until one is available
-  while ((numTasksRunning <-
-          processRunningTasks(useFuture, debugFuture)) > model$scenvars$maxrscriptinstances) {
+  repeat {
+    numTasksRunning <-
+      processRunningTasks(useFuture, debugFuture)
     if (debugFuture)
       print(
         paste0(
@@ -91,9 +92,14 @@ for (g in 1:groups) {
           getRunningTasksStatus()
         )
       )
-    Sys.sleep(30)
+    if (numTasksRunning < model$scenvars$maxcostrscripts) {
+      break
+    } else {
+      Sys.sleep(30)
+    }
   } #end while waiting for free slots
-  taskName <-       paste0(
+
+    taskName <-       paste0(
     "Supplier_to_Buyer_Costs_makeInputs_naics-",
     naics,
     "_group-",
@@ -193,19 +199,26 @@ for (g in 1:groups) {
 } #end loop over groups
 
 #wait until all tasks are finished
-while ((numrscript <-
-        processRunningTasks(useFuture, debugFuture)) > 0) {
+#loop until all running tasks are finished
+repeat {
+  numTasksRunning <-
+    processRunningTasks(useFuture, debugFuture)
   if (debugFuture)
     print(
       paste0(
         Sys.time(),
         ": Waiting for final ",
-        numrscript,
-        " Supplier_to_Buyer_Costs_makeInputs tasks to finish."
+        numTasksRunning,
+        "Supplier_to_Buyer_Costs_makeInputs running tasks to finish. ",
+        getRunningTasksStatus()
       )
     )
-  Sys.sleep(30)
-} #end while final Supplier_to_Buyer_Costs_makeInputs tasks are still running
+  if (numTasksRunning < model$scenvars$maxrscriptinstances) {
+    break
+  } else {
+    Sys.sleep(30)
+  }
+} #end while waiting for all tasks to finish
 
 #close off logging
 write(print(
