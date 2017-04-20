@@ -289,7 +289,7 @@ for (g in 1:groups) {
             Sys.time(),
             ": Waiting for some of the ",
             numTasksRunning,
-            "PMG running tasks to finish so can work on remaining ",
+            " PMG running tasks to finish so can work on remaining ",
             ((groups - g) + 1),
             " tasks. Tasks: ",
             getRunningTasksStatus()
@@ -425,11 +425,11 @@ repeat {
         Sys.time(),
         ": Waiting for final ",
         numTasksRunning,
-        "PMG running tasks to finish. ",
+        " PMG running tasks to finish. ",
         getRunningTasksStatus()
       )
     )
-  if (numTasksRunning < model$scenvars$maxrscriptinstances) {
+  if (numTasksRunning == 0) {
     break
   } else {
     Sys.sleep(30)
