@@ -10,7 +10,6 @@
 library(future)
 plan(multisession)
 
-source("./scripts/00_utilities.R")
 
 asyncTasksRunning <- list()
 
@@ -20,9 +19,9 @@ startAsyncTask <-
            callback = NULL,
            debug = FALSE) {
     if (debug)
-      debugConsole(paste0("startAsyncTask asyncTaskName '",
-                          asyncTaskName,
-                          "' called"))
+      print(paste0("startAsyncTask asyncTaskName '",
+                   asyncTaskName,
+                   "' called"))
 
     if (exists(asyncTaskName, asyncTasksRunning)) {
       stop(
@@ -40,10 +39,10 @@ startAsyncTask <-
     asyncTasksRunning[[asyncTaskName]] <<- asyncTaskObject
   } #end startAsyncTask
 
-processRunningTasks <- function(useFuture, debug = FALSE) {
-  numRScriptsRunning <- -1
+processRunningTasks <- function(useFuture = TRUE, debug = FALSE) {
+  numRunningTasks <- -1
   if (useFuture) {
-    numRScriptsRunning <- checkAsyncTasksRunning(debug = debugFuture)
+    numRunningTasks <- checkAsyncTasksRunning(debug = debug)
     if (debug) {
       print(paste0(Sys.time(), ": remaining ", getRunningTasksStatus()))
     }
@@ -54,10 +53,10 @@ processRunningTasks <- function(useFuture, debug = FALSE) {
     #look for number of Groups running
     tasklist.tasks <- substr(tasklist[-(1:3)] , 1 , 25)
     tasklist.tasks <- gsub(" " , "" , tasklist.tasks)
-    numRScriptsRunning <-
+    numRunningTasks <-
       length(tasklist.tasks[tasklist.tasks == "Rscript.exe"])
   }
-  return(numRScriptsRunning)
+  return(numRunningTasks)
 } #end processRunningTasks
 
 
@@ -101,7 +100,7 @@ checkAsyncTasksRunning <-
       if ((maximumTasksToResolve > 0) &&
           (numTasksResolved >= maximumTasksToResolve)) {
         if (debug)
-          debugConsole(
+          print(
             paste0(
               "checkAsyncTasksRunning: stopping checking for resolved tasks because maximumTasksToResolve (",
               maximumTasksToResolve,
@@ -125,7 +124,7 @@ checkAsyncTasksRunning <-
             },
             warning = function(w) {
               caughtWarning <- w
-              debugConsole(
+              print(
                 paste0(
                   "***WARNING*** checkAsyncTasksRunning: '",
                   asyncTaskName,
@@ -137,7 +136,7 @@ checkAsyncTasksRunning <-
             },
             error = function(e) {
               caughtError <- e
-              debugConsole(
+              print(
                 paste0(
                   "***ERROR*** checkAsyncTasksRunning: '",
                   asyncTaskName,
@@ -154,11 +153,12 @@ checkAsyncTasksRunning <-
           #therefore will propagate to the caller
           taskResult <- value(asyncFutureObject)
         }
+        rm(asyncFutureObject)
         startTime <- asyncTaskObject$startTime
         endTime <- Sys.time()
         elapsedTime <- format(endTime - startTime)
         if (debug)
-          debugConsole(
+          print(
             paste0(
               "checkAsyncTasksRunning finished: '",
               asyncTaskName,
@@ -211,9 +211,31 @@ testAsync <- function(loops = future::availableCores() - 1) {
     return(data.frame(name = name, test = Sys.time()))
   } #end fakeDataProcessing
 
-  loops <- future::availableCores() - 1
+  maxRunningTasks <- min(2, future::availableCores() - 1)
+  sleepTime <- 2
+  loops <- 6 #
   baseWait <- 3
   for (loopNumber in 1:loops) {
+    repeat {
+      numTasksRunning <-
+        processRunningTasks(debug=TRUE)
+      print(
+        paste0(
+          Sys.time(),
+          ": Waiting for some of the ",
+          numTasksRunning,
+          " running tasks to finish so can work on remaining ",
+          ((loops - loopNumber) + 1),
+          " tasks. Tasks: ",
+          getRunningTasksStatus()
+        )
+      )
+      if (numTasksRunning < maxRunningTasks) {
+        break
+      } else {
+        Sys.sleep(sleepTime)
+      }
+    } #end while waiting for free slots
     duration <- baseWait + loopNumber
     dataName <-
       paste0("FAKE_PROCESSED_DATA_testLoop-",
