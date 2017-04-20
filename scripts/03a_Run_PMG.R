@@ -42,7 +42,6 @@ loadPackage("bit64")
 options(datatable.auto.index = FALSE)
 ##async tools
 ##########################################
-useFuture <- TRUE
 debugFuture <- TRUE
 source("./scripts/00_Async_Tasks.R")
 ########################################
@@ -282,19 +281,7 @@ for (g in 1:groups) {
     #if all processors are in use wait until one is available
     repeat {
       numTasksRunning <-
-        processRunningTasks(debug=debugFuture, useFuture=useFuture)
-      if (FALSE && debugFuture)
-        print(
-          paste0(
-            Sys.time(),
-            ": Waiting for some of the ",
-            numTasksRunning,
-            " PMG running tasks to finish so can work on remaining ",
-            ((groups - g) + 1),
-            " tasks. Tasks: ",
-            getRunningTasksStatus()
-          )
-        )
+        processRunningTasks()
       if (numTasksRunning < model$scenvars$maxrscriptinstances) {
         break
       } else {
@@ -418,17 +405,7 @@ for (g in 1:groups) {
 #loop until all running tasks are finished
 repeat {
   numTasksRunning <-
-    processRunningTasks(debug=debugFuture, useFuture=useFuture)
-  if (FALSE && debugFuture)
-    print(
-      paste0(
-        Sys.time(),
-        ": Waiting for final ",
-        numTasksRunning,
-        " PMG running tasks to finish. ",
-        getRunningTasksStatus()
-      )
-    )
+    processRunningTasks()
   if (numTasksRunning == 0) {
     break
   } else {

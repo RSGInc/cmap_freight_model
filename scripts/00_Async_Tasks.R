@@ -30,26 +30,6 @@ startAsyncTask <-
     asyncTasksRunning[[asyncTaskName]] <<- asyncTaskObject
   } #end startAsyncTask
 
-processRunningTasks <- function(debug = FALSE, useFuture = TRUE) {
-  numRunningTasks <- -1
-  if (useFuture) {
-    numRunningTasks <- checkAsyncTasksRunning(debug = debug)
-    if (debug) {
-      print(paste0(Sys.time(), ": remaining ", getRunningTasksStatus()))
-    }
-  } else {
-    #get current running tasks
-    tasklist <- system2('tasklist' , stdout = TRUE)
-
-    #look for number of Groups running
-    tasklist.tasks <- substr(tasklist[-(1:3)] , 1 , 25)
-    tasklist.tasks <- gsub(" " , "" , tasklist.tasks)
-    numRunningTasks <-
-      length(tasklist.tasks[tasklist.tasks == "Rscript.exe"])
-  }
-  return(numRunningTasks)
-} #end processRunningTasks
-
 
 getRunningTasksStatus <- function() {
   getRunningTaskStatus <- function(asyncTaskObject) {
@@ -81,7 +61,7 @@ getRunningTasksStatus <- function() {
 
 #' Meant to called periodically, this will check all running asyncTasks for completion
 #' Returns number of remaining tasks so could be used as a boolean
-checkAsyncTasksRunning <-
+processRunningTasks <-
   function(catchErrors = TRUE,
            debug = FALSE,
            maximumTasksToResolve = -1)
@@ -93,7 +73,7 @@ checkAsyncTasksRunning <-
         if (debug)
           print(
             paste0(
-              "checkAsyncTasksRunning: stopping checking for resolved tasks because maximumTasksToResolve (",
+              "processRunningTasks: stopping checking for resolved tasks because maximumTasksToResolve (",
               maximumTasksToResolve,
               ") already resolved."
             )
@@ -117,7 +97,7 @@ checkAsyncTasksRunning <-
               caughtWarning <- w
               print(
                 paste0(
-                  "***WARNING*** checkAsyncTasksRunning: '",
+                  "***WARNING*** processRunningTasks: '",
                   asyncTaskName,
                   "' returned a warning: ",
                   w
@@ -129,7 +109,7 @@ checkAsyncTasksRunning <-
               caughtError <- e
               print(
                 paste0(
-                  "***ERROR*** checkAsyncTasksRunning: '",
+                  "***ERROR*** processRunningTasks: '",
                   asyncTaskName,
                   "' returned an error: ",
                   e
@@ -151,7 +131,7 @@ checkAsyncTasksRunning <-
         if (debug)
           print(
             paste0(
-              "checkAsyncTasksRunning finished: '",
+              "processRunningTasks finished: '",
               asyncTaskName,
               "'. startTime: ",
               startTime,
@@ -180,7 +160,7 @@ checkAsyncTasksRunning <-
     }#end loop over async data items being loaded
     #Any more asynchronous data items being loaded?
     return(length(asyncTasksRunning))
-  } # end checkAsyncTasksRunning
+  } # end processRunningTasks
 
 testAsync <- function(loops = future::availableCores() - 1) {
   fakeDataProcessing <- function(name, duration, sys_sleep = FALSE) {
@@ -243,7 +223,7 @@ testAsync <- function(loops = future::availableCores() - 1) {
     ": After all tasks submitted: ",
     getRunningTasksStatus()
   ))
-  while (checkAsyncTasksRunning(debug = TRUE) > 0)
+  while (processRunningTasks(debug = TRUE) > 0)
   {
     Sys.sleep(1)
     print(getRunningTasksStatus())
