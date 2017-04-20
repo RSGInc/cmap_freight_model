@@ -23,6 +23,9 @@ load(file.path(model$outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 
+if (nrow(naics_set) != length(model$scenvars$pmgnaicstorun)) {
+  stop(paste("Some of model$scenvars$pmgnaicstorun were not found in the naics_set. Number requested=",length(model$scenvars$pmgnaicstorun), ", number found=", nrow(naics_set)))
+}
 for (naics_run_number in 1:nrow(naics_set)) {
   naics <- naics_set$NAICS[naics_run_number]
   groups <- naics_set$groups[naics_run_number]
