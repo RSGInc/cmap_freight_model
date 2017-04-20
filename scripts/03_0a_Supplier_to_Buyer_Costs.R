@@ -80,7 +80,7 @@ for (g in 1:groups) {
   repeat {
     numTasksRunning <-
       processRunningTasks(debug=debugFuture, useFuture=useFuture)
-    if (debugFuture)
+    if (FALSE && debugFuture)
       print(
         paste0(
           Sys.time(),
@@ -109,19 +109,6 @@ for (g in 1:groups) {
     "_sprod-",
     sprod
   )
-    print(paste("beforeCall 2", "taskName", taskName))
-    naics_and_group_string <- gsub("^.*naics[-]([^_]+)_group[-]([^_]+)_.*$", "\\1 \\2", taskName)
-    print(paste("beforeCall 3", "naics_and_group_string", naics_and_group_string))
-    naics_and_group <- strsplit(naics_and_group_string, split = " ")[[1]]
-    print(paste("beforeCall 4", "naics_and_group", naics_and_group))
-    taskNaics <- naics_and_group[[1]]
-    print(paste("beforeCall 5", "taskNaics", taskNaics))
-    taskGroup <- naics_and_group[[2]]
-    print(paste("beforeCall 6", "taskGroup", taskGroup))
-    costs_file_path <- file.path(model$outputdir,paste0(taskNaics, "_g", taskGroup, ".costs.csv"))
-    print(paste("beforeCall 7", "costs_file_path", costs_file_path))
-    cost_file_exists <- file.exists(costs_file_path)
-    print(paste("beforeCall 8", "cost_file_exists", cost_file_exists))
     write(paste0(Sys.time(), ": Starting ", taskName),
         file = baseLogFilePath,
         append = TRUE)
@@ -184,21 +171,13 @@ for (g in 1:groups) {
       #                        caughtError,
       #                        caughtWarning)
       #check that cost files was create
-      print(paste("callback 1"))
       taskName <- asyncResults[["asyncTaskName"]]
-      print(paste("callback2", "taskName", taskName))
       naics_and_group_string <- gsub("^.*naics[-]([^_]+)_group[-]([^_]+)_.*$", "\\1 \\2", taskName)
-      print(paste("callback 3", "naics_and_group_string", naics_and_group_string))
       naics_and_group <- strsplit(naics_and_group_string, split = " ")[[1]]
-      print(paste("callback 4", "naics_and_group", naics_and_group))
       taskNaics <- naics_and_group[[1]]
-      print(paste("callback 5", "taskNaics", taskNaics))
       taskGroup <- naics_and_group[[2]]
-      print(paste("callback 6", "taskGroup", taskGroup))
       costs_file_path <- file.path(model$outputdir,paste0(taskNaics, "_g", taskGroup, ".costs.csv"))
-      print(paste("callback 7", "costs_file_path", costs_file_path))
       cost_file_exists <- file.exists(costs_file_path)
-      print(paste("callback 8", "cost_file_exists", cost_file_exists))
       write(print(
         paste0(
           Sys.time(),
@@ -224,7 +203,7 @@ for (g in 1:groups) {
 repeat {
   numTasksRunning <-
     processRunningTasks(debug=debugFuture, useFuture=useFuture)
-  if (debugFuture)
+  if (FALSE && debugFuture)
     print(
       paste0(
         Sys.time(),

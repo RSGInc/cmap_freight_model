@@ -283,7 +283,7 @@ for (g in 1:groups) {
     repeat {
       numTasksRunning <-
         processRunningTasks(debug=debugFuture, useFuture=useFuture)
-      if (debugFuture)
+      if (FALSE && debugFuture)
         print(
           paste0(
             Sys.time(),
@@ -419,7 +419,7 @@ for (g in 1:groups) {
 repeat {
   numTasksRunning <-
     processRunningTasks(debug=debugFuture, useFuture=useFuture)
-  if (debugFuture)
+  if (FALSE && debugFuture)
     print(
       paste0(
         Sys.time(),
@@ -436,33 +436,14 @@ repeat {
   }
 } #end while waiting for all tasks to finish
 
-if (debugFuture)
-  print(paste0(Sys.time(),
-               ": 1 run_PMG"))
 #convert output list to one table, add to workspace, and save
 #apply fix for bit64/data.table handling of large integers in rbindlist
 pairs <- rbindlist(pmgoutputs)
-if (debugFuture)
-  print(paste0(
-    Sys.time(),
-    ": 2 run_PMG",
-    "names(pairs):",
-    paste0(collapse = ", ", names(pairs))
-  ))
 rm(pmgoutputs)
 pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
-if (debugFuture)
-  print(paste0(Sys.time(),
-               ": 3 run_PMG"))
 
 pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
-if (debugFuture)
-  print(paste0(Sys.time(),
-               ": 4 run_PMG"))
 save(consc, prodc, pairs, file = file.path(outputdir, paste0(naics, ".Rdata")))
-if (debugFuture)
-  print(paste0(Sys.time(),
-               ": 5 run_PMG"))
 
 #close off logging
 writeLines(print(
@@ -475,9 +456,6 @@ writeLines(print(
 ),
 con = pmgtimes)
 close(pmgtimes)
-if (debugFuture)
-  print(paste0(Sys.time(),
-               ":  run_PMG"))
 
 #end sinking
 sink(type = "message")
