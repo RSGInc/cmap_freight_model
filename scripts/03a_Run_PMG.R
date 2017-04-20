@@ -282,7 +282,7 @@ for (g in 1:groups) {
     #if all processors are in use wait until one is available
     repeat {
       numTasksRunning <-
-        processRunningTasks(useFuture, debugFuture)
+        processRunningTasks(debug=debugFuture, useFuture=useFuture)
       if (debugFuture)
         print(
           paste0(
@@ -418,7 +418,7 @@ for (g in 1:groups) {
 #loop until all running tasks are finished
 repeat {
   numTasksRunning <-
-    processRunningTasks(useFuture, debugFuture)
+    processRunningTasks(debug=debugFuture, useFuture=useFuture)
   if (debugFuture)
     print(
       paste0(

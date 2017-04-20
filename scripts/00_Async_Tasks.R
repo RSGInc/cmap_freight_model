@@ -1,12 +1,3 @@
-##############################################################################################
-#Title:             CMAP Agent Based Freight Forecasting Code
-#Project:           CMAP Agent-based economics extension to the meso-scale freight model
-#Description:       00_asyncTasks provides startAsyncTask and checkAsyncTasksRunning to
-# provide an easy way to run asynchronous
-#Date:              April 14, 2017
-#Author:            Resource Systems Group, Inc.
-#Copyright:         Copyright 2017 RSG, Inc. - All rights reserved.
-##############################################################################################
 library(future)
 plan(multisession)
 
@@ -39,7 +30,7 @@ startAsyncTask <-
     asyncTasksRunning[[asyncTaskName]] <<- asyncTaskObject
   } #end startAsyncTask
 
-processRunningTasks <- function(useFuture = TRUE, debug = FALSE) {
+processRunningTasks <- function(debug = FALSE, useFuture = TRUE) {
   numRunningTasks <- -1
   if (useFuture) {
     numRunningTasks <- checkAsyncTasksRunning(debug = debug)
@@ -211,9 +202,9 @@ testAsync <- function(loops = future::availableCores() - 1) {
     return(data.frame(name = name, test = Sys.time()))
   } #end fakeDataProcessing
 
-  maxRunningTasks <- min(2, future::availableCores() - 1)
+  maxRunningTasks <- max(1, future::availableCores() - 1)
   sleepTime <- 2
-  loops <- 6 #
+  loops <- 10 #
   baseWait <- 3
   for (loopNumber in 1:loops) {
     repeat {
