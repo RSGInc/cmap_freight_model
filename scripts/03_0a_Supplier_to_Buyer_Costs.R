@@ -165,7 +165,12 @@ for (g in 1:groups) {
       #                        caughtError,
       #                        caughtWarning)
       #check that cost files was create
-      costs_file_path <- file.path(model$outputdir,paste0(naics, "_g", g, ".costs.csv"))
+      taskName <- asyncResults[["asyncTaskName"]]
+      naics_and_group_string <- gsub("naics-([^_]+)_group-([^_]+)_", "\\1 \\2", taskName)
+      naics_and_group <- strsplit(naics_and_group_string, split = " ")[[1]]
+      taskNaics <- naics_and_group[[1]]
+      taskGroup <- naics_and_group[[2]]
+      costs_file_path <- file.path(model$outputdir,paste0(taskNaics, "_g", taskGroup, ".costs.csv"))
       cost_file_exists <- file.exists(costs_file_path)
       write(print(
         paste0(
