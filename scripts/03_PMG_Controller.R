@@ -39,9 +39,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
       model$basedir,
       model$outputdir
     )
-  print(paste("Starting rScriptCmd:", rScriptCmd))
+  print(paste0(Sys.time(),": Starting rScriptCmd: ", rScriptCmd))
   exitStatus <- system(rScriptCmd, wait = TRUE)
-  print(paste("Finished rScriptCmd:", rScriptCmd))
+  print(paste0(Sys.time(),": Finished rScriptCmd: ", rScriptCmd))
   if (exitStatus != 0) {
     stop(paste0("ERROR exitStatus: ", exitStatus, " when running '", rScriptCmd, "'"))
   }
@@ -81,9 +81,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
       model$basedir,
       model$outputdir
     )
-  print(paste("Starting rScriptCmd:", rScriptCmd))
+  print(paste0(Sys.time(),": Starting rScriptCmd: ", rScriptCmd))
   exitStatus <- system(rScriptCmd, wait = TRUE)
-  print(paste("Finished rScriptCmd:", rScriptCmd))
+  print(paste0(Sys.time(),": Finished rScriptCmd: ", rScriptCmd))
   if (exitStatus != 0) {
     stop(paste0("ERROR exitStatus: ", exitStatus, " when running '", rScriptCmd, "'"))
   }
