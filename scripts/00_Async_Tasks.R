@@ -1,8 +1,9 @@
 library(future)
 
 #NOTE: the file that 'source's this should also call plan(multiprocess, workers=<desired number of workers>) for example:
-#plan(multiprocess, workers=min(myNumTasks, MAX_PROCESSES))
+#plan(multiprocess, workers=min((myNumTasks+1), MAX_PROCESSES))
 #it is not required to specify workers -- if not then it will default to future::availableCores()
+#use myNumTasks+1 because future uses one process for itself.
 
 asyncTasksRunning <- list()
 
