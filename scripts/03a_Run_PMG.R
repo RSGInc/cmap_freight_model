@@ -44,7 +44,8 @@ options(datatable.auto.index = FALSE)
 ##########################################
 debugFuture <- TRUE
 source("./scripts/00_Async_Tasks.R")
-plan(multiprocess, workers=min(groups, model$scenvars$maxrscriptinstances))
+plan(multiprocess,
+     workers = min(groups, model$scenvars$maxrscriptinstances))
 ########################################
 
 #load required packages
@@ -292,109 +293,79 @@ for (g in 1:groups) {
           file = pmgtimes,
           append = TRUE)
 
-    doAsync <- TRUE
+    startAsyncTask(
+      taskName,
+      future({
+        #call to runPMG to run the game
+        runPMGLocal(
+          naics,
+          g,
+          writelog = TRUE,
+          #model$scenvars$pmglogging,
+          wait = TRUE,
+          inpath = outputdir,
+          outpath = outputdir,
+          log_folder = outputdir
+        )
+      }),
+      callback = function(asyncResults) {
+        # asyncResults is: list(asyncTaskName,
+        #                        taskResult,
+        #                        startTime,
+        #                        endTime,
+        #                        elapsedTime,
+        #                        caughtError,
+        #                        caughtWarning)
+        msg <- paste(Sys.time(),
+                     "Completed:",
+                     asyncResults[["asyncTaskName"]],
+                     "Running time:",
+                     asyncResults[["elapsedTime"]])
+        print(msg)
+        if (!model$scenvars$pmglogging) {
+          writeLines(msg,
+                     con = pmggrouptimes)
+          close(pmggrouptimes)
+        }
 
-    if (!doAsync) {
-      runPMGLocal(
-        naics,
-        g,
-        writelog = TRUE,
-        #model$scenvars$pmglogging,
-        wait = TRUE,
-        inpath = outputdir,
-        outpath = outputdir,
-        log_folder = outputdir
-      )
-      doesOutputExist <- processPMGOutputs(g, pmgtimes)
-      print(
-        paste(
-          "doesOutputExist?:",
-          doesOutputExist,
+        writeLines(msg,
+                   con = pmgtimes)
+
+        print(paste(
+          "Deleting Inputs:",
           naics,
           "Group",
           g,
           "Current time",
           Sys.time()
-        )
-      )
+        ))
 
-    } else {
-      startAsyncTask(
-        taskName,
-        future({
-          #call to runPMG to run the game
-          runPMGLocal(
-            naics,
-            g,
-            writelog = TRUE,
-            #model$scenvars$pmglogging,
-            wait = TRUE,
-            inpath = outputdir,
-            outpath = outputdir,
-            log_folder = outputdir
-          )
-        }),
-        callback = function(asyncResults) {
-          # asyncResults is: list(asyncTaskName,
-          #                        taskResult,
-          #                        startTime,
-          #                        endTime,
-          #                        elapsedTime,
-          #                        caughtError,
-          #                        caughtWarning)
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
 
-
-
-          msg <- paste(Sys.time(),
-                       "Completed:",
-                       asyncResults[["asyncTaskName"]],
-                       "Running time:",
-                       asyncResults[["elapsedTime"]])
-          print(msg)
-          if (!model$scenvars$pmglogging) {
-            writeLines(msg,
-                       con = pmggrouptimes)
-            close(pmggrouptimes)
-          }
-
-          writeLines(msg,
-                     con = pmgtimes)
-
-          print(paste(
-            "Deleting Inputs:",
+        doesOutputExist <- processPMGOutputs(g, pmgtimes)
+        print(
+          paste(
+            "doesOutputExist?:",
+            doesOutputExist,
             naics,
             "Group",
             g,
             "Current time",
             Sys.time()
-          ))
-
-          file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
-          file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
-          file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
-
-          doesOutputExist <- processPMGOutputs(g, pmgtimes)
-          print(
-            paste(
-              "doesOutputExist?:",
-              doesOutputExist,
-              naics,
-              "Group",
-              g,
-              "Current time",
-              Sys.time()
-            )
           )
-        },
-        #end callback
-        debug = debugFuture
-      ) #end call to startAsyncTask
-    } #end else doAsync
+        )
+      },
+      #end callback
+      debug = debugFuture
+    ) #end call to startAsyncTask
+    processRunningTasks(wait = FALSE, debug = TRUE)
   } #end if file does not exist already
 }#end loop over groups
 
 #wait until all tasks are finished
-processRunningTasks(wait=TRUE)
+processRunningTasks(wait = TRUE, debug=TRUE)
 
 #convert output list to one table, add to workspace, and save
 #apply fix for bit64/data.table handling of large integers in rbindlist
