@@ -27,7 +27,7 @@ startAsyncTask <-
         submitTime,
         ": startAsyncTask asyncTaskName '",
         asyncTaskName,
-        "' called"
+        "' called. There are now ", length(asyncTasksRunning)+1, " current tasks."
       ))
 
     if (exists(asyncTaskName, asyncTasksRunning)) {
