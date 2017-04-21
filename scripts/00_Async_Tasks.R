@@ -268,4 +268,4 @@ testAsync <- function(loops = future::availableCores() - 1) {
     getRunningTasksStatus()
   ))
 } #end testAsync
-testAsync()
+#testAsync()
