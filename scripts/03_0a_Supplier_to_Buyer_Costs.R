@@ -42,8 +42,9 @@ options(datatable.auto.index = FALSE)
 ##########################################
 debugFuture <- TRUE
 source("./scripts/00_Async_Tasks.R")
+#only allocate as many workers as we need (including one for future itself) or to the specified maximum
 plan(multiprocess,
-     workers = min(groups, model$scenvars$maxcostrscripts))
+     workers = min((groups+1), model$scenvars$maxcostrscripts))
 ########################################
 
 getNewLogFilePath <- function(group) {
