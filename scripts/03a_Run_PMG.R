@@ -44,7 +44,7 @@ options(datatable.auto.index = FALSE)
 ##########################################
 debugFuture <- TRUE
 source("./scripts/00_Async_Tasks.R")
-plan(multiprocess, workers=model$scenvars$maxrscriptinstances)
+plan(multiprocess, workers=min(groups, model$scenvars$maxrscriptinstances))
 ########################################
 
 #load required packages
@@ -279,16 +279,6 @@ processPMGOutputs <- function(g, log_file_path = NULL) {
 for (g in 1:groups) {
   if (!processPMGOutputs(g, pmgtimes)) {
     #output file does not exist so must be calculated
-    # #if all processors are in use wait until one is available
-    # repeat {
-    #   numTasksRunning <-
-    #     processRunningTasks()
-    #   if (numTasksRunning < model$scenvars$maxrscriptinstances) {
-    #     break
-    #   } else {
-    #     Sys.sleep(30)
-    #   }
-    # } #end while waiting for free slots
 
     taskName <-       paste0("RunPMG_naics-",
                              naics,
@@ -403,16 +393,8 @@ for (g in 1:groups) {
   } #end if file does not exist already
 }#end loop over groups
 
-#loop until all running tasks are finished
-repeat {
-  numTasksRunning <-
-    processRunningTasks()
-  if (numTasksRunning == 0) {
-    break
-  } else {
-    Sys.sleep(30)
-  }
-} #end while waiting for all tasks to finish
+#wait until all tasks are finished
+processRunningTasks(wait=TRUE)
 
 #convert output list to one table, add to workspace, and save
 #apply fix for bit64/data.table handling of large integers in rbindlist

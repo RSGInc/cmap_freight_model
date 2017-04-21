@@ -61,7 +61,7 @@ getRunningTasksStatus <- function() {
 #' Meant to called periodically, this will check all running asyncTasks for completion
 #' Returns number of remaining tasks so could be used as a boolean
 processRunningTasks <-
-  function(catchErrors = TRUE,
+  function(wait=FALSE, catchErrors = TRUE,
            debug = FALSE,
            maximumTasksToResolve = -1)
   {
@@ -81,7 +81,7 @@ processRunningTasks <-
       } #end checking if need to break because of maximumTasksToResolve
       asyncTaskObject <- asyncTasksRunning[[asyncTaskName]]
       asyncFutureObject <- asyncTaskObject$futureObj
-      if (resolved(asyncFutureObject)) {
+      if (!wait || resolved(asyncFutureObject)) {
         taskResult <- NULL
         numTasksResolved <- numTasksResolved + 1
         #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
@@ -222,11 +222,15 @@ testAsync <- function(loops = future::availableCores() - 1) {
     ": After all tasks submitted: ",
     getRunningTasksStatus()
   ))
+
+  #could call processRunningTasks(wait=TRUE, debug = TRUE) to have blocked...
+  #but for this I will poll...
   while (processRunningTasks(debug = TRUE) > 0)
   {
     Sys.sleep(1)
     print(getRunningTasksStatus())
   }
+
   print(paste0(
     "At the end the status should have no running tasks: ",
     getRunningTasksStatus()
