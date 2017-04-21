@@ -42,6 +42,7 @@ options(datatable.auto.index = FALSE)
 ##########################################
 debugFuture <- TRUE
 source("./scripts/00_Async_Tasks.R")
+plan(multiprocess, workers=model$scenvars$maxcostrscripts)
 ########################################
 
 getNewLogFilePath <- function(group) {
@@ -75,16 +76,16 @@ if (!"group" %in% names(prodc))
 #loop over the groups and prepare the files for running the games
 for (g in 1:groups) {
   log_file_path <- getNewLogFilePath(g)
-  #if all processors are in use wait until one is available
-  repeat {
-    numTasksRunning <-
-      processRunningTasks()
-    if (numTasksRunning < model$scenvars$maxcostrscripts) {
-      break
-    } else {
-      Sys.sleep(30)
-    }
-  } #end while waiting for free slots
+  # #if all processors are in use wait until one is available
+  # repeat {
+  #   numTasksRunning <-
+  #     processRunningTasks()
+  #   if (numTasksRunning < model$scenvars$maxcostrscripts) {
+  #     break
+  #   } else {
+  #     Sys.sleep(30)
+  #   }
+  # } #end while waiting for free slots
 
     taskName <-       paste0(
     "Supplier_to_Buyer_Costs_makeInputs_naics-",

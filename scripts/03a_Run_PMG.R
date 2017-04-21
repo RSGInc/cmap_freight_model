@@ -44,6 +44,7 @@ options(datatable.auto.index = FALSE)
 ##########################################
 debugFuture <- TRUE
 source("./scripts/00_Async_Tasks.R")
+plan(multiprocess, workers=model$scenvars$maxrscriptinstances)
 ########################################
 
 #load required packages
@@ -278,16 +279,16 @@ processPMGOutputs <- function(g, log_file_path = NULL) {
 for (g in 1:groups) {
   if (!processPMGOutputs(g, pmgtimes)) {
     #output file does not exist so must be calculated
-    #if all processors are in use wait until one is available
-    repeat {
-      numTasksRunning <-
-        processRunningTasks()
-      if (numTasksRunning < model$scenvars$maxrscriptinstances) {
-        break
-      } else {
-        Sys.sleep(30)
-      }
-    } #end while waiting for free slots
+    # #if all processors are in use wait until one is available
+    # repeat {
+    #   numTasksRunning <-
+    #     processRunningTasks()
+    #   if (numTasksRunning < model$scenvars$maxrscriptinstances) {
+    #     break
+    #   } else {
+    #     Sys.sleep(30)
+    #   }
+    # } #end while waiting for free slots
 
     taskName <-       paste0("RunPMG_naics-",
                              naics,

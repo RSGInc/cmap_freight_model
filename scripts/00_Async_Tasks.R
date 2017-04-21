@@ -1,5 +1,4 @@
 library(future)
-plan(multisession)
 
 
 asyncTasksRunning <- list()
