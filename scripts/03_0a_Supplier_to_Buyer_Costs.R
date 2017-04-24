@@ -126,7 +126,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
             "Current time",
             Sys.time()
           ))
-          write(msg, file = log_file_path, append = TRUE)
+          write(print(msg), file = log_file_path, append = TRUE)
 
           msg <- print(paste(
             "Making Inputs:",
@@ -136,7 +136,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
             "Current time",
             Sys.time()
           ))
-          write(msg, file = log_file_path, append = TRUE)
+          write(print(msg), file = log_file_path, append = TRUE)
           recycle_check_file_path <-
             file.path(
               model$outputdir,
@@ -210,7 +210,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
 
   #close off logging
-  write(print(paste0(Sys.time(), ": Completed naics: ", naics, " with ", groups, " groups. sprod: ", sprod)),
+  write(print(paste0(Sys.time(), ": Completed submitting naics: ", naics, " with ", groups, " groups. sprod: ", sprod, " ", getRunningTasksStatus())),
         file = baseLogFilePath, append = TRUE)
 
 } #end for (naics_run_number in 1:nrow(naics_set))
