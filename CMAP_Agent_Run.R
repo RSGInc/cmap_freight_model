@@ -20,7 +20,7 @@ if (is.null(scriptpath) ||
   print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
   if (is.null(scriptDir) ||
       is.na(scriptDir) ||
-      (nchar(scriptDir) == 0)) {
+      scriptDir== "") {
     scriptDir <- getwd()
     #print(paste("getwd():", getwd()))
     if (!file.exists("cmap_freight_model.Rproj"))
