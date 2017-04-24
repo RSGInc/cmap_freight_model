@@ -17,9 +17,10 @@ if (is.null(scriptpath) ||
   #How to get script directory: http://stackoverflow.com/a/30306616/283973
   scriptDir <- getSrcDirectory(function(x)
     x)
-  #print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
+  print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
   if (is.null(scriptDir) ||
-      is.na(scriptDir) || (nchar(scriptDir) == 0)) {
+      is.na(scriptDir) ||
+      (nchar(scriptDir) == 0)) {
     scriptDir <- getwd()
     #print(paste("getwd():", getwd()))
     if (!file.exists("cmap_freight_model.Rproj"))
