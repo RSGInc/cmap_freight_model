@@ -15,35 +15,37 @@
 #---------------------------------------------------------------------
 
 #1.Set the base directory (the directory in which the model resides)
-library(envDocument)
-scriptpath <- envDocument::get_scriptpath()
-#print(paste("envDocument::get_scriptpath():", envDocument::get_scriptpath()))
+if (!exists("scenario")) {
+  library(envDocument)
+  scriptpath <- envDocument::get_scriptpath()
+  #print(paste("envDocument::get_scriptpath():", envDocument::get_scriptpath()))
 
-if (is.null(scriptpath) ||
-    is.na(scriptpath) || (nchar(scriptpath) == 0)) {
-  #How to get script directory: http://stackoverflow.com/a/30306616/283973
-  scriptDir <- getSrcDirectory(function(x)
-    x)
-  #print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
-  if (scriptDir == "") {
-    scriptDir <- getwd()
-    #print(paste("getwd():", getwd()))
-    if (!file.exists("cmap_freight_model.Rproj"))
-      stop(
-        paste0(
-          "Can not find path of script and the working directory '",
-          scriptDir,
-          "' does not appear to be the project root!"
+  if (is.null(scriptpath) ||
+      is.na(scriptpath) || (nchar(scriptpath) == 0)) {
+    #How to get script directory: http://stackoverflow.com/a/30306616/283973
+    scriptDir <- getSrcDirectory(function(x)
+      x)
+    #print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
+    if (scriptDir == "") {
+      scriptDir <- getwd()
+      #print(paste("getwd():", getwd()))
+      if (!file.exists("cmap_freight_model.Rproj"))
+        stop(
+          paste0(
+            "Can not find path of script and the working directory '",
+            scriptDir,
+            "' does not appear to be the project root!"
+          )
         )
-      )
+    }
+    basedir <- scriptDir
+  } else {
+    scriptdir <- dirname(scriptpath)
+    basedir <-
+      dirname(scriptdir) #basedir is the root of the github repo -- one above the scripts directory
   }
-  basedir <- scriptDir
-} else {
-  scriptdir <- dirname(scriptpath)
-  basedir <-
-    dirname(scriptdir) #basedir is the root of the github repo -- one above the scripts directory
-}
-print(paste0("basedir: ", basedir))
+  print(paste0("basedir: ", basedir))
+} #end if baseDir not already set
 #there is code, such as source statments that assume the working directory is set to base
 setwd(basedir)
 
