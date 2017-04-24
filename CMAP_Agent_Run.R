@@ -18,8 +18,8 @@ if (is.null(scriptpath) ||
   scriptDir <- getSrcDirectory(function(x)
     x)
   print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
-  if (is.null(scriptDir) ||
-      is.na(scriptDir) ||
+  if (is.null(scriptDir) != FALSE ||
+      is.na(scriptDir) != FALSE ||
       scriptDir== "") {
     scriptDir <- getwd()
     #print(paste("getwd():", getwd()))
