@@ -10,16 +10,31 @@
 #1.Set the base directory (the directory in which the model resides)
 library(envDocument)
 scriptpath <- envDocument::get_scriptpath()
+#print(paste("envDocument::get_scriptpath():", envDocument::get_scriptpath()))
 
-if (is.null(scriptpath) || is.na(scriptpath)) {
-  warning(
-    "Can not find path of script so must assume that the working directory is set to the project root"
-  )
-  basedir <- getwd()
+if (is.null(scriptpath) ||
+    is.na(scriptpath) || (nchar(scriptpath) == 0)) {
+  #How to get script directory: http://stackoverflow.com/a/30306616/283973
+  scriptDir <- getSrcDirectory(function(x)
+    x)
+  #print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
+  if (scriptDir == "") {
+    scriptDir <- getwd()
+    #print(paste("getwd():", getwd()))
+    if (!file.exists("cmap_freight_model.Rproj"))
+      stop(
+        paste0(
+          "Can not find path of script and the working directory '",
+          scriptDir,
+          "' does not appear to be the project root!"
+        )
+      )
+  }
+  basedir <- scriptDir
 } else {
-  scriptDir <- dirname(scriptpath)
+  scriptdir <- dirname(scriptpath)
   basedir <-
-    scriptDir #basedir is the root of the github repo -- which this script is in
+    scriptdir #basedir is the root of the github repo -- one above the scripts directory
 }
 print(paste0("basedir: ", basedir))
 #there is code, such as source statments that assume the working directory is set to base
@@ -29,5 +44,4 @@ setwd(basedir)
 scenario <- "base"
 
 #3. Run the model
-source(file.path(basedir,"scripts","00_Main.R"))
-
+source(file.path(basedir, "scripts", "00_Main.R"))

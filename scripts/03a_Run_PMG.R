@@ -43,7 +43,7 @@ options(datatable.auto.index = FALSE)
 ##async tools
 ##########################################
 debugFuture <- TRUE
-source("./scripts/00_Async_Tasks.R")
+source("./scripts/FutureTaskProcessor.R")
 #only allocate as many workers as we need (including one for future itself) or to the specified maximum
 plan(multiprocess,
      workers = min((groups+1), model$scenvars$maxrscriptinstances))

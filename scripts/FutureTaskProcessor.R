@@ -1,4 +1,6 @@
+if (!require(future)) install.packages("future")
 library(future)
+#FutureTaskProcessor.R https://gist.github.com/PeterVermont/a4a29d2c6b88e4ee012a869dedb5099c#file-futuretaskprocessor-r
 
 #NOTE: the file that 'source's this should also call plan(multiprocess, workers=<desired number of workers>) for example:
 #plan(multiprocess, workers=min((myNumTasks+1), MAX_PROCESSES))
