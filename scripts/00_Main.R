@@ -20,15 +20,12 @@ if (!exists("scenario")) {
   scriptpath <- envDocument::get_scriptpath()
   #print(paste("envDocument::get_scriptpath():", envDocument::get_scriptpath()))
 
-  if (is.null(scriptpath) ||
-      is.na(scriptpath) || (nchar(scriptpath) == 0)) {
+  if (length(scriptDir) == 0) {
     #How to get script directory: http://stackoverflow.com/a/30306616/283973
     scriptDir <- getSrcDirectory(function(x)
       x)
-    #print(paste("getSrcDirectory(function(x)x):", getSrcDirectory(function(x)x)))
-    if (is.null(scriptDir) != FALSE ||
-        is.na(scriptDir) != FALSE ||
-        scriptDir== "") {
+
+    if (length(scriptDir) == 0) {
       scriptDir <- getwd()
       #print(paste("getwd():", getwd()))
       if (!file.exists("cmap_freight_model.Rproj"))
