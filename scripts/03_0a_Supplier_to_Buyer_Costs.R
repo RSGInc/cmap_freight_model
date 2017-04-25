@@ -69,19 +69,6 @@ for (naics_run_number in 1:nrow(naics_set)) {
   #load the workspace for this naics code
   load(file.path(outputdir, paste0(naics, ".Rdata")))
 
-  write(print(
-    paste0(
-      Sys.time(),
-      ": Starting naics: ",
-      naics,
-      " with ",
-      groups,
-      " groups. sprod: ",
-      sprod
-    )
-  ),
-  file = log_file_path,
-  append = TRUE)
   #check whether sampling within the group has been done and if not run that function
   if (!"group" %in% names(prodc))
     create_pmg_sample_groups(naics, groups, sprod)
