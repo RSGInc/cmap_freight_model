@@ -29,7 +29,7 @@ plan(multiprocess,
      workers = model$scenvars$maxcostrscripts)
 ########################################
 
-load(file.path(model$outputdir, "naics_set.Rdata"))
+load(file.path(outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 
@@ -139,7 +139,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
           write(print(msg), file = log_file_path, append = TRUE)
           recycle_check_file_path <-
             file.path(
-              model$outputdir,
+              outputdir,
               paste0(
                 "recycle_check_naics-",
                 naics,
@@ -179,7 +179,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
         taskNaics <- naics_and_group[[1]]
         taskGroup <- naics_and_group[[2]]
         costs_file_path <-
-          file.path(model$outputdir,
+          file.path(outputdir,
                     paste0(taskNaics, "_g", taskGroup, ".costs.csv"))
         cost_file_exists <- file.exists(costs_file_path)
         write(print(

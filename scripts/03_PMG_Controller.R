@@ -59,25 +59,23 @@ if (model$scenvars$pmgmonitoring)
     wait = FALSE
   )
 
-for (naics_run_number in 1:nrow(naics_set)) {
-  naics <- naics_set$NAICS[naics_run_number]
-  groups <- naics_set$groups[naics_run_number]
-  sprod <- ifelse(naics_set$Split_Prod[naics_run_number], 1, 0)
-  rScriptCmd <-
-    paste(
-      "Rscript .\\scripts\\03a_Run_PMG.R",
-      naics,
-      groups,
-      sprod,
-      model$basedir,
-      model$outputdir
-    )
-  print(paste0(Sys.time(),": Starting rScriptCmd: ", rScriptCmd))
-  exitStatus <- system(rScriptCmd, wait = TRUE)
-  print(paste0(Sys.time(),": Finished rScriptCmd: ", rScriptCmd))
-  if (exitStatus != 0) {
-    stop(paste0("ERROR exitStatus: ", exitStatus, " when running '", rScriptCmd, "'"))
-  }
-} #end for (naics_run_number in 1:nrow(naics_set))
+rScriptCmd <-
+  paste(
+    "Rscript .\\scripts\\03a_Run_PMG.R",
+    model$basedir,
+    model$outputdir
+  )
+print(paste0(Sys.time(), ": Starting rScriptCmd: ", rScriptCmd))
+exitStatus <- system(rScriptCmd, wait = TRUE)
+print(paste0(Sys.time(), ": Finished rScriptCmd: ", rScriptCmd))
+if (exitStatus != 0) {
+  stop(paste0(
+    "ERROR exitStatus: ",
+    exitStatus,
+    " when running '",
+    rScriptCmd,
+    "'"
+  ))
+}
 
 pmgcon <- progressEnd(pmgcon)

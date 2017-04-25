@@ -13,25 +13,13 @@
 #which NAICS should be run, in how many groups, and do we split producers?
 #what are the paths to the base directory of the model and to the current scenario?
 args <- commandArgs(TRUE)
-naics <- args[1]
-groups <- as.integer(args[2])
-sprod <- as.integer(args[3])
-basedir <- args[4]
-outputdir <- args[5]
+basedir <- args[1]
+outputdir <- args[2]
 
 setwd(basedir)
 
-#Start logging
-PMG_Log <- file.path(outputdir, paste0(naics, "_PMG_Log.txt"))
-log <- file(PMG_Log, open = "wt")
-sink(log, split = T)
-sink(log, type = "message")
-
 #load the pmg workspace
 load(file.path(outputdir, "PMG_Workspace.Rdata"))
-
-#load the workspace for this naics code
-load(file.path(outputdir, paste0(naics, ".Rdata")))
 
 
 library(rFreight, lib.loc = "./library/")
@@ -46,7 +34,7 @@ debugFuture <- TRUE
 source("./scripts/FutureTaskProcessor.R")
 #only allocate as many workers as we need (including one for future itself) or to the specified maximum
 plan(multiprocess,
-     workers = min((groups+1), model$scenvars$maxrscriptinstances))
+     workers = model$scenvars$maxrscriptinstances)
 ########################################
 
 #load required packages
@@ -229,58 +217,133 @@ runPMGLocal <-
 
 #list to hold the summarized outputs, file to hold timings
 pmgoutputs <- list()
-pmgtimes <-
-  file(file.path(outputdir, paste0(naics, ".txt")), open = "wt")
-writeLines(print(paste(
-  "Starting:", naics, "Current time", Sys.time()
-)), con =
-  pmgtimes)
 
-processPMGOutputs <- function(g, log_file_path = NULL) {
-  doOutputsExist <-
-    file.exists(file.path(outputdir, paste0(naics, "_g", g, ".out.csv")))
-  if (doOutputsExist) {
-    if (!is.null(log_file_path))
-      write(print(
-        paste(
-          "Processing Outputs:",
-          naics,
-          "Group",
-          g,
-          "Current time",
-          Sys.time()
-        )
-      ), file = log_file_path, append = TRUE)
-
-    pmgout <-
-      fread(file.path(outputdir, paste0(naics, "_g", g, ".out.csv")))
-
-    setnames(pmgout, c("BuyerId", "SellerId"), c("BuyerID", "SellerID"))
-
-    #get just the results from the final iteration
-
-    pmgout <- pmgout[Last.Iteration.Quantity > 0]
-
-    #apply fix for bit64/data.table handling of large integers in rbindlist
-
-    pmgout[, Quantity.Traded := as.character(Quantity.Traded)]
-
-    pmgout[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
-
-    load(file.path(outputdir, paste0(naics, "_g", g, ".Rdata")))
-
-    pmgoutputs[[g]] <<-
-      merge(pc, pmgout, by = c("BuyerID", "SellerID"))
-
-    rm(pmgout, pc)
+processPMGOutputs <- function(naics, g, groups, log_file_path) {
+  expectedOutputFile <-
+    file.path(outputdir, paste0(naics, "_g", g, ".out.csv"))
+  if (!file.exists(expectedOutputFile)) {
+    stop("Expected PMG output file '",
+         expectedOutputFile,
+         "' does not exist!")
   }
-  return(doOutputsExist)
+  write(print(
+    paste(
+      "Processing Outputs:",
+      naics,
+      "Group",
+      g,
+      "Current time",
+      Sys.time()
+    )
+  ), file = log_file_path, append = TRUE)
+
+  pmgout <-
+    fread(expectedOutputFile)
+
+  setnames(pmgout, c("BuyerId", "SellerId"), c("BuyerID", "SellerID"))
+
+  #get just the results from the final iteration
+
+  pmgout <- pmgout[Last.Iteration.Quantity > 0]
+
+  #apply fix for bit64/data.table handling of large integers in rbindlist
+
+  pmgout[, Quantity.Traded := as.character(Quantity.Traded)]
+
+  pmgout[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
+
+  load(file.path(outputdir, paste0(naics, "_g", g, ".Rdata")))
+
+  if (!(naics %in% names(pmgoutputs))) {
+    pmgoutputs[[naics]] <<- list()
+  }
+  groupoutputs <- pmgoutputs[[naics]]
+  groupoutputs[[g]] <-
+    merge(pc, pmgout, by = c("BuyerID", "SellerID"))
+
+  rm(pmgout, pc)
+  print(paste0(Sys.time(),
+               ": Deleting Inputs: ",
+               naics,
+               " Group: ",
+               g))
+
+  file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
+  file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
+  file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
+
+  if (length(groupoutputs) == groups) {
+    #convert output list to one table, add to workspace, and save
+    #apply fix for bit64/data.table handling of large integers in rbindlist
+    naicsRDataFile <- file.path(outputdir, paste0(naics, ".Rdata"))
+    load(naicsRDataFile)
+    pairs <- rbindlist(groupoutputs)
+    pmgoutputs[[naics]] <<- NULL #delete naic from tracked outputs
+    pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
+
+    pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
+    save(consc, prodc, pairs, file = naicsRDataFile)
+  } #end if all groups in naic are finished
+  return(NULL) #no need to return anything
 } #end processPMGOutputs
 
-#loop over the groups and run the games, and process outputs
-for (g in 1:groups) {
-  if (!processPMGOutputs(g, pmgtimes)) {
-    #output file does not exist so must be calculated
+load(file.path(model$outputdir, "naics_set.Rdata"))
+naics_set <-
+  subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
+
+if (nrow(naics_set) != length(model$scenvars$pmgnaicstorun)) {
+  stop(
+    paste(
+      "Some of model$scenvars$pmgnaicstorun were not found in the naics_set. Number requested=",
+      length(model$scenvars$pmgnaicstorun),
+      ", number found=",
+      nrow(naics_set)
+    )
+  )
+}
+for (naics_run_number in 1:nrow(naics_set)) {
+  naics <- naics_set$NAICS[naics_run_number]
+  groups <- naics_set$groups[naics_run_number]
+  sprod <- ifelse(naics_set$Split_Prod[naics_run_number], 1, 0)
+
+  #load the workspace for this naics code
+  #load(file.path(outputdir, paste0(naics, ".Rdata")))
+
+
+  getNewLogFilePath <- function(group) {
+    newLogFilePath <-
+      file.path(outputdir,
+                paste0(
+                  naics,
+                  "_group_",
+                  sprintf("%06d", group),
+                  "_PMGRun_Log.txt"
+                ))
+    #create or truncate the file so we can use append below
+    file.create(newLogFilePath)
+    return(newLogFilePath)
+  }
+
+  #file to hold timings
+  baseLogFilePath <- getNewLogFilePath(0)
+
+  write(print(
+    paste0(
+      Sys.time(),
+      ": Starting naics: ",
+      naics,
+      " with ",
+      groups,
+      " groups. sprod: ",
+      sprod
+    )
+  ),
+  file = baseLogFilePath,
+  append = TRUE)
+
+  #loop over the groups and run the games, and process outputs
+  for (g in 1:groups) {
+    log_file_path <- getNewLogFilePath(g)
 
     taskName <-       paste0("RunPMG_naics-",
                              naics,
@@ -290,10 +353,6 @@ for (g in 1:groups) {
                              groups,
                              "_sprod-",
                              sprod)
-    write(paste0(Sys.time(), ": Starting ", taskName),
-          file = pmgtimes,
-          append = TRUE)
-
     startAsyncTask(
       taskName,
       future({
@@ -317,79 +376,42 @@ for (g in 1:groups) {
         #                        elapsedTime,
         #                        caughtError,
         #                        caughtWarning)
-        msg <- paste(Sys.time(),
-                     "Completed:",
-                     asyncResults[["asyncTaskName"]],
-                     "Running time:",
-                     asyncResults[["elapsedTime"]])
-        print(msg)
-        if (!model$scenvars$pmglogging) {
-          writeLines(msg,
-                     con = pmggrouptimes)
-          close(pmggrouptimes)
-        }
 
-        writeLines(msg,
-                   con = pmgtimes)
-
-        print(paste(
-          "Deleting Inputs:",
-          naics,
-          "Group",
-          g,
-          "Current time",
-          Sys.time()
-        ))
-
-        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
-        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
-        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
-
-        doesOutputExist <- processPMGOutputs(g, pmgtimes)
-        print(
-          paste(
-            "doesOutputExist?:",
-            doesOutputExist,
-            naics,
-            "Group",
-            g,
-            "Current time",
-            Sys.time()
-          )
-        )
+        processPMGOutputs(naics, g, groups, log_file_path)
       },
       #end callback
       debug = debugFuture
     ) #end call to startAsyncTask
     processRunningTasks(wait = FALSE, debug = TRUE)
-  } #end if file does not exist already
-}#end loop over groups
+  }#end loop over groups
+
+
+  write(print(
+    paste0(
+      Sys.time(),
+      ": Completed submitting naics: ",
+      naics,
+      " with ",
+      groups,
+      " groups. sprod: ",
+      sprod,
+      " ",
+      getRunningTasksStatus()
+    )
+  ),
+  file = baseLogFilePath, append = TRUE)
+
+} #end for (naics_run_number in 1:nrow(naics_set))
+
 
 #wait until all tasks are finished
-processRunningTasks(wait = TRUE, debug=TRUE)
+processRunningTasks(wait = TRUE, debug = TRUE)
 
-#convert output list to one table, add to workspace, and save
-#apply fix for bit64/data.table handling of large integers in rbindlist
-pairs <- rbindlist(pmgoutputs)
-rm(pmgoutputs)
-pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
+if (length(pmgoutputs) != 0) {
+  stop(paste(
+    "At end of Run_PMG there were still some unfinished naics! Unfinished: ",
+    paste0(collapse = ", ", names(pmgoutputs))
+  ))
+}
 
-pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
-save(consc, prodc, pairs, file = file.path(outputdir, paste0(naics, ".Rdata")))
-
-#close off logging
-writeLines(print(
-  paste(
-    "Completed Processing Outputs:",
-    naics,
-    "Current time",
-    Sys.time()
-  )
-),
-con = pmgtimes)
-close(pmgtimes)
-
-#end sinking
-sink(type = "message")
-sink()
 quit(save = "no", status = 0)
