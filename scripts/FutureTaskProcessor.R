@@ -107,31 +107,31 @@ processRunningTasks <-
     for (asyncTaskName in names(asyncTasksRunning)) {
       if (!is.null(maximumTasksToResolve) &&
           (numTasksResolved >= maximumTasksToResolve)) {
-        if (debug)
-          print(
-            paste0(
-              Sys.time(),
-              ": processRunningTasks: stopping checking for resolved tasks because maximumTasksToResolve (",
-              maximumTasksToResolve,
-              ") already resolved."
-            )
-          )
+        # if (debug)
+        #   print(
+        #     paste0(
+        #       Sys.time(),
+        #       ": processRunningTasks: stopping checking for resolved tasks because maximumTasksToResolve (",
+        #       maximumTasksToResolve,
+        #       ") already resolved."
+        #     )
+        #   )
         break
       } #end checking if need to break because of maximumTasksToResolve
       asyncTaskObject <- asyncTasksRunning[[asyncTaskName]]
       asyncFutureObject <- asyncTaskObject[["futureObj"]]
       isObjectResolved <- resolved(asyncFutureObject)
       if (isObjectResolved || wait) {
-        # if (debug && !isObjectResolved) {
-        #   print(
-        #     paste0(
-        #       Sys.time(),
-        #       ": processRunningTasks about to wait for task '",
-        #       asyncTaskName,
-        #       "' to finish. ", length(asyncTasksRunning), " tasks still running."
-        #     )
-        #   )
-        # }
+        if (debug && !isObjectResolved) {
+          print(
+            paste0(
+              Sys.time(),
+              ": processRunningTasks about to wait for task '",
+              asyncTaskName,
+              "' to finish. ", length(asyncTasksRunning), " tasks still running."
+            )
+          )
+        }
         taskResult <- NULL
         numTasksResolved <- numTasksResolved + 1
         #NOTE future will send any errors it caught when we ask it for the value -- same as if we had evaluated the expression ourselves
