@@ -91,7 +91,6 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
   #loop over the groups and prepare the files for running the games
   for (g in 1:groups) {
-    log_file_path <- getNewLogFilePath(g)
 
     taskName <-       paste0(
       "Supplier_to_Buyer_Costs_makeInputs_naics-",
