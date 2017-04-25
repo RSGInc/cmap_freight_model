@@ -153,6 +153,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
           strsplit(naics_and_group_string, split = " ")[[1]]
         taskNaics <- naics_and_group[[1]]
         taskGroup <- naics_and_group[[2]]
+        task_log_file_path <-
+          file.path(outputdir, paste0(taskNaics, "_PMGRun_Log.txt"))
         costs_file_path <-
           file.path(outputdir,
                     paste0(taskNaics, "_g", taskGroup, ".costs.csv"))
@@ -161,20 +163,20 @@ for (naics_run_number in 1:nrow(naics_set)) {
           paste0(
             Sys.time(),
             ": Finished ",
-            asyncResults[["asyncTaskName"]],
+            taskName,
             ", Elapsed time since submitted: ",
             asyncResults[["elapsedTime"]],
             ", cost_file_exists: ",
             cost_file_exists
           )
         ),
-        file = log_file_path,
+        file = task_log_file_path,
         append = TRUE)
         if (!cost_file_exists) {
           msg <- paste("***ERROR*** Did not find expected costs file '",
                        costs_file_path,
                        "'.")
-          write(print(msg), file = log_file_path, append = TRUE)
+          write(print(msg), file = task_log_file_path, append = TRUE)
           stop(msg)
         }
       },

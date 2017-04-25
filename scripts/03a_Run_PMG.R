@@ -298,18 +298,30 @@ for (naics_run_number in 1:nrow(naics_set)) {
         #                        caughtError,
         #                        caughtWarning)
 
-        write(print(
+        taskName <- asyncResults[["asyncTaskName"]]
+        naics_and_group_string <-
+          gsub("^.*naics[-]([^_]+)_group[-]([^_]+)_.*$",
+               "\\1 \\2",
+               taskName)
+        naics_and_group <-
+          strsplit(naics_and_group_string, split = " ")[[1]]
+        taskNaics <- naics_and_group[[1]]
+        taskGroup <- naics_and_group[[2]]
+        task_log_file_path <-
+          file.path(outputdir, paste0(taskNaics, "_PMGRun_Log.txt"))
+
+                write(print(
           paste0(
             Sys.time(),
             ": task '",
-            asyncResults[["asyncTaskName"]],
+            taskName,
             "' finished. Elapsed time since submitted: ",
             asyncResults[["elapsedTime"]]
           )
-        ), file = log_file_path, append = TRUE)
+        ), file = task_log_file_path, append = TRUE)
 
         expectedOutputFile <-
-          file.path(outputdir, paste0(naics, "_g", g, ".out.csv"))
+          file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".out.csv"))
         if (!file.exists(expectedOutputFile)) {
           msg <- paste0(
             Sys.time(),
@@ -317,7 +329,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
             expectedOutputFile,
             "' does not exist!"
           )
-          write(print(msg), file = log_file_path, append = TRUE)
+          write(print(msg), file = task_log_file_path, append = TRUE)
           stop(msg)
         }
         pmgout <-
@@ -337,7 +349,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         pmgout[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
 
-        load(file.path(outputdir, paste0(naics, "_g", g, ".Rdata")))
+        load(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".Rdata")))
 
         if (!(naics %in% names(pmgoutputs))) {
           pmgoutputs[[naics]] <<- list()
@@ -347,21 +359,21 @@ for (naics_run_number in 1:nrow(naics_set)) {
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
         rm(pmgout, pc)
-        print(paste0(Sys.time(),
+        write(print(paste0(Sys.time(),
                      ": Deleting Inputs: ",
-                     naics,
+                     taskNaics,
                      " Group: ",
-                     g))
+                     taskGroup)), file=task_log_file_path, append=TRUE)
 
-        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
-        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
-        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
+        file.remove(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".costs.csv")))
+        file.remove(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".buy.csv")))
+        file.remove(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".sell.csv")))
 
         if (length(groupoutputs) == groups) {
           #convert output list to one table, add to workspace, and save
           #apply fix for bit64/data.table handling of large integers in rbindlist
           naicsRDataFile <-
-            file.path(outputdir, paste0(naics, ".Rdata"))
+            file.path(outputdir, paste0(taskNaics, ".Rdata"))
           load(naicsRDataFile)
           pairs <- rbindlist(groupoutputs)
           pmgoutputs[[naics]] <<-
@@ -377,7 +389,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
               groups,
               " groups"
             )
-          ), file = log_file_path, append = TRUE)
+          ), file = task_log_file_path, append = TRUE)
         } #end if all groups in naic are finished
       },
       #end callback
