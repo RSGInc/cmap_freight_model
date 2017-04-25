@@ -12,7 +12,7 @@ library(envDocument)
 scriptpath <- envDocument::get_scriptpath()
 #print(paste("envDocument::get_scriptpath():", envDocument::get_scriptpath()))
 
-if (length(scriptDir) == 0) {
+if (length(scriptpath) == 0) {
   #How to get script directory: http://stackoverflow.com/a/30306616/283973
   scriptDir <- getSrcDirectory(function(x)
     x)
