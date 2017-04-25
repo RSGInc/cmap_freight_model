@@ -94,7 +94,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
         Sys.time(),
         ": Submitting task '",
         taskName,
-        "' to join #",
+        "' to join ",
         getNumberOfRunningTasks(), " currently running tasks"
       )
     ), file = log_file_path, append = TRUE)
