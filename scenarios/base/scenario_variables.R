@@ -96,7 +96,7 @@ HighVariability     <- 0.09
 #---------------------------------------------------------------------
 
 # max number of R script instances to run at once for determining Supplier to Buyer costs (1 for monitoring if that is run)
-maxcostrscripts <- min(8, max(1, future::availableCores()-2))
+maxcostrscripts <- min(8, max(1, future::availableCores()-1))
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
 #maxrscriptinstances <- 32
@@ -107,9 +107,9 @@ maxrscriptinstances <- maxcostrscripts
 pmgmonitoring <- TRUE
 
 pmgnaicstorun <- c(
-  #326220 #, 212230,336414, 332420
+  326220, 212230,336414, 332420
   #324122 #,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330
-  113000, 211000,212100
+  #113000, 211000,212100
 )
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
