@@ -29,7 +29,7 @@ debug <- TRUE
 while (naicsrun <= naicstorun){
 
   #check if the next naics market is ready
-  naicsLogPath <-file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],".txt"))
+  naicsLogPath <-file.path(model$outputdir,paste0(naics_set$NAICS[naicsrun],"_PMGRun_Log.txt"))
   fileExists <- file.exists(naicsLogPath)
   if (debug) print(paste("naicsLogPath:", naicsLogPath, "fileExists:", fileExists, "file.size:", file.size(naicsLogPath)))
   if (fileExists) {

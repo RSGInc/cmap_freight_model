@@ -47,43 +47,41 @@ for (naics_run_number in 1:nrow(naics_set)) {
   naics <- naics_set$NAICS[naics_run_number]
   groups <- naics_set$groups[naics_run_number]
   sprod <- ifelse(naics_set$Split_Prod[naics_run_number], 1, 0)
-  # #Start logging
-  # PMGset_Log <-
-  #   file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt"))
-  # doSink <- FALSE
-  #
-  # if (doSink) {
-  #   log <- file(PMGset_Log, open = "wt")
-  #   sink(log, split = T)
-  #   sink(log, type = "message")
-  # }
+
+  log_file_path <-
+    file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt"))
+  file.create(log_file_path)
+
+  write(print(
+    paste0(
+      Sys.time(),
+      ": Starting naics: ",
+      naics,
+      " with ",
+      groups,
+      " groups. sprod: ",
+      sprod
+    )
+  ),
+  file = log_file_path,
+  append = TRUE)
 
   #load the workspace for this naics code
   load(file.path(outputdir, paste0(naics, ".Rdata")))
 
-
-  getNewLogFilePath <- function(group) {
-    newLogFilePath <-
-      file.path(outputdir,
-                paste0(
-                  naics,
-                  "_group_",
-                  sprintf("%06d", group),
-                  "_PMGSetup_Log.txt"
-                ))
-    #create or truncate the file so we can use append below
-    file.create(newLogFilePath)
-    return(newLogFilePath)
-  }
-
-  #file to hold timings
-  baseLogFilePath <- getNewLogFilePath(0)
-
-  write(
-    print(paste0(Sys.time(), ": Starting naics: ", naics, " with ", groups, " groups. sprod: ", sprod)),
-    file = baseLogFilePath,
-    append = TRUE
-  )
+  write(print(
+    paste0(
+      Sys.time(),
+      ": Starting naics: ",
+      naics,
+      " with ",
+      groups,
+      " groups. sprod: ",
+      sprod
+    )
+  ),
+  file = log_file_path,
+  append = TRUE)
   #check whether sampling within the group has been done and if not run that function
   if (!"group" %in% names(prodc))
     create_pmg_sample_groups(naics, groups, sprod)
@@ -105,9 +103,15 @@ for (naics_run_number in 1:nrow(naics_set)) {
       "_sprod-",
       sprod
     )
-    write(paste0(Sys.time(), ": Starting ", taskName),
-          file = baseLogFilePath,
-          append = TRUE)
+    write(print(
+      paste0(
+        Sys.time(),
+        ": Submitting task '",
+        taskName,
+        "' ",
+        getRunningTasksStatus()
+      )
+    ), file = log_file_path, append = TRUE)
     startAsyncTask(
       taskName,
       future({
@@ -118,25 +122,17 @@ for (naics_run_number in 1:nrow(naics_set)) {
         }
 
         if (!file.exists(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))) {
-          msg <- print(paste(
-            "Starting:",
-            naics,
-            "Group",
-            g,
-            "Current time",
-            Sys.time()
-          ))
-          write(print(msg), file = log_file_path, append = TRUE)
+          msg <-
+            write(print(
+              paste0(
+                Sys.time(),
+                " Starting creating inputs for: ",
+                naics,
+                ",  Group: ",
+                g
+              )
+            ), file = log_file_path, append = TRUE)
 
-          msg <- print(paste(
-            "Making Inputs:",
-            naics,
-            "Group",
-            g,
-            "Current time",
-            Sys.time()
-          ))
-          write(print(msg), file = log_file_path, append = TRUE)
           recycle_check_file_path <-
             file.path(
               outputdir,
@@ -150,13 +146,6 @@ for (naics_run_number in 1:nrow(naics_set)) {
             )
           file.create(recycle_check_file_path)
           create_pmg_inputs(naics, g, sprod, recycle_check_file_path)
-
-          if (!model$scenvars$pmglogging) {
-            pmggrouptimes <-
-              file(file.path(outputdir, paste0(naics, "_g", g, ".txt")), open = "wt")
-            writeLines(print(msg),
-                       con = pmggrouptimes)
-          }
         }
         return(NULL) #no need to return anything to future task handler
       }),
@@ -187,34 +176,27 @@ for (naics_run_number in 1:nrow(naics_set)) {
             Sys.time(),
             ": Finished ",
             asyncResults[["asyncTaskName"]],
-            ", Running time: ",
+            ", Elapsed time since submitted: ",
             asyncResults[["elapsedTime"]],
             ", cost_file_exists: ",
             cost_file_exists
           )
         ),
-        file = baseLogFilePath,
+        file = log_file_path,
         append = TRUE)
         if (!cost_file_exists) {
-          stop(paste(
-            "***ERROR*** Did not find expected costs file '",
-            costs_file_path,
-            "'."
-          ))
+          msg <- paste("***ERROR*** Did not find expected costs file '",
+                       costs_file_path,
+                       "'.")
+          write(print(msg), file = log_file_path, append = TRUE)
+          stop(msg)
         }
       },
       debug = debugFuture
     ) #end call to startAsyncTask
     processRunningTasks(wait = FALSE, debug = TRUE)
   } #end loop over groups
-
-
-  #close off logging
-  write(print(paste0(Sys.time(), ": Completed submitting naics: ", naics, " with ", groups, " groups. sprod: ", sprod, " ", getRunningTasksStatus())),
-        file = baseLogFilePath, append = TRUE)
-
 } #end for (naics_run_number in 1:nrow(naics_set))
-
 
 #wait until all tasks are finished
 processRunningTasks(wait = TRUE, debug = TRUE)

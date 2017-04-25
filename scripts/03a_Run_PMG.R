@@ -218,76 +218,7 @@ runPMGLocal <-
 #list to hold the summarized outputs, file to hold timings
 pmgoutputs <- list()
 
-processPMGOutputs <- function(naics, g, groups, log_file_path) {
-  expectedOutputFile <-
-    file.path(outputdir, paste0(naics, "_g", g, ".out.csv"))
-  if (!file.exists(expectedOutputFile)) {
-    stop("Expected PMG output file '",
-         expectedOutputFile,
-         "' does not exist!")
-  }
-  write(print(
-    paste(
-      "Processing Outputs:",
-      naics,
-      "Group",
-      g,
-      "Current time",
-      Sys.time()
-    )
-  ), file = log_file_path, append = TRUE)
-
-  pmgout <-
-    fread(expectedOutputFile)
-
-  setnames(pmgout, c("BuyerId", "SellerId"), c("BuyerID", "SellerID"))
-
-  #get just the results from the final iteration
-
-  pmgout <- pmgout[Last.Iteration.Quantity > 0]
-
-  #apply fix for bit64/data.table handling of large integers in rbindlist
-
-  pmgout[, Quantity.Traded := as.character(Quantity.Traded)]
-
-  pmgout[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
-
-  load(file.path(outputdir, paste0(naics, "_g", g, ".Rdata")))
-
-  if (!(naics %in% names(pmgoutputs))) {
-    pmgoutputs[[naics]] <<- list()
-  }
-  groupoutputs <- pmgoutputs[[naics]]
-  groupoutputs[[g]] <-
-    merge(pc, pmgout, by = c("BuyerID", "SellerID"))
-
-  rm(pmgout, pc)
-  print(paste0(Sys.time(),
-               ": Deleting Inputs: ",
-               naics,
-               " Group: ",
-               g))
-
-  file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
-  file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
-  file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
-
-  if (length(groupoutputs) == groups) {
-    #convert output list to one table, add to workspace, and save
-    #apply fix for bit64/data.table handling of large integers in rbindlist
-    naicsRDataFile <- file.path(outputdir, paste0(naics, ".Rdata"))
-    load(naicsRDataFile)
-    pairs <- rbindlist(groupoutputs)
-    pmgoutputs[[naics]] <<- NULL #delete naic from tracked outputs
-    pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
-
-    pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
-    save(consc, prodc, pairs, file = naicsRDataFile)
-  } #end if all groups in naic are finished
-  return(NULL) #no need to return anything
-} #end processPMGOutputs
-
-load(file.path(model$outputdir, "naics_set.Rdata"))
+load(file.path(outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 
@@ -306,26 +237,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
   groups <- naics_set$groups[naics_run_number]
   sprod <- ifelse(naics_set$Split_Prod[naics_run_number], 1, 0)
 
-  #load the workspace for this naics code
-  #load(file.path(outputdir, paste0(naics, ".Rdata")))
-
-
-  getNewLogFilePath <- function(group) {
-    newLogFilePath <-
-      file.path(outputdir,
-                paste0(
-                  naics,
-                  "_group_",
-                  sprintf("%06d", group),
-                  "_PMGRun_Log.txt"
-                ))
-    #create or truncate the file so we can use append below
-    file.create(newLogFilePath)
-    return(newLogFilePath)
-  }
-
-  #file to hold timings
-  baseLogFilePath <- getNewLogFilePath(0)
+  log_file_path <-
+    file.path(outputdir, paste0(naics, "_PMGRun_Log.txt"))
+  file.create(log_file_path)
 
   write(print(
     paste0(
@@ -338,13 +252,11 @@ for (naics_run_number in 1:nrow(naics_set)) {
       sprod
     )
   ),
-  file = baseLogFilePath,
+  file = log_file_path,
   append = TRUE)
 
   #loop over the groups and run the games, and process outputs
   for (g in 1:groups) {
-    log_file_path <- getNewLogFilePath(g)
-
     taskName <-       paste0("RunPMG_naics-",
                              naics,
                              "_group-",
@@ -353,6 +265,16 @@ for (naics_run_number in 1:nrow(naics_set)) {
                              groups,
                              "_sprod-",
                              sprod)
+    write(print(
+      paste0(
+        Sys.time(),
+        ": Submitting task '",
+        taskName,
+        "' ",
+        getRunningTasksStatus()
+      )
+    ), file = log_file_path, append = TRUE)
+
     startAsyncTask(
       taskName,
       future({
@@ -360,8 +282,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
         runPMGLocal(
           naics,
           g,
-          writelog = TRUE,
-          #model$scenvars$pmglogging,
+          writelog = model$scenvars$pmglogging,
           wait = TRUE,
           inpath = outputdir,
           outpath = outputdir,
@@ -377,32 +298,94 @@ for (naics_run_number in 1:nrow(naics_set)) {
         #                        caughtError,
         #                        caughtWarning)
 
-        processPMGOutputs(naics, g, groups, log_file_path)
+        write(print(
+          paste0(
+            Sys.time(),
+            ": task '",
+            asyncResults[["asyncTaskName"]],
+            "' finished. Elapsed time since submitted: ",
+            asyncResults[["elapsedTime"]]
+          )
+        ), file = log_file_path, append = TRUE)
+
+        expectedOutputFile <-
+          file.path(outputdir, paste0(naics, "_g", g, ".out.csv"))
+        if (!file.exists(expectedOutputFile)) {
+          msg <- paste0(
+            Sys.time(),
+            ": Expected PMG output file '",
+            expectedOutputFile,
+            "' does not exist!"
+          )
+          write(print(msg), file = log_file_path, append = TRUE)
+          stop(msg)
+        }
+        pmgout <-
+          fread(expectedOutputFile)
+
+        setnames(pmgout,
+                 c("BuyerId", "SellerId"),
+                 c("BuyerID", "SellerID"))
+
+        #get just the results from the final iteration
+
+        pmgout <- pmgout[Last.Iteration.Quantity > 0]
+
+        #apply fix for bit64/data.table handling of large integers in rbindlist
+
+        pmgout[, Quantity.Traded := as.character(Quantity.Traded)]
+
+        pmgout[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
+
+        load(file.path(outputdir, paste0(naics, "_g", g, ".Rdata")))
+
+        if (!(naics %in% names(pmgoutputs))) {
+          pmgoutputs[[naics]] <<- list()
+        }
+        groupoutputs <- pmgoutputs[[naics]]
+        groupoutputs[[g]] <-
+          merge(pc, pmgout, by = c("BuyerID", "SellerID"))
+
+        rm(pmgout, pc)
+        print(paste0(Sys.time(),
+                     ": Deleting Inputs: ",
+                     naics,
+                     " Group: ",
+                     g))
+
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".costs.csv")))
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".buy.csv")))
+        file.remove(file.path(outputdir, paste0(naics, "_g", g, ".sell.csv")))
+
+        if (length(groupoutputs) == groups) {
+          #convert output list to one table, add to workspace, and save
+          #apply fix for bit64/data.table handling of large integers in rbindlist
+          naicsRDataFile <-
+            file.path(outputdir, paste0(naics, ".Rdata"))
+          load(naicsRDataFile)
+          pairs <- rbindlist(groupoutputs)
+          pmgoutputs[[naics]] <<-
+            NULL #delete naic from tracked outputs
+          pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
+
+          pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
+          save(consc, prodc, pairs, file = naicsRDataFile)
+          write(print(
+            paste0(
+              Sys.time(),
+              ": Completed Processing Outputs of all ",
+              groups,
+              " groups"
+            )
+          ), file = log_file_path, append = TRUE)
+        } #end if all groups in naic are finished
       },
       #end callback
       debug = debugFuture
     ) #end call to startAsyncTask
     processRunningTasks(wait = FALSE, debug = TRUE)
   }#end loop over groups
-
-
-  write(print(
-    paste0(
-      Sys.time(),
-      ": Completed submitting naics: ",
-      naics,
-      " with ",
-      groups,
-      " groups. sprod: ",
-      sprod,
-      " ",
-      getRunningTasksStatus()
-    )
-  ),
-  file = baseLogFilePath, append = TRUE)
-
 } #end for (naics_run_number in 1:nrow(naics_set))
-
 
 #wait until all tasks are finished
 processRunningTasks(wait = TRUE, debug = TRUE)
