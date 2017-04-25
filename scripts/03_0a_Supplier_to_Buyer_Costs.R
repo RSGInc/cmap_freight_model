@@ -94,8 +94,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
         Sys.time(),
         ": Submitting task '",
         taskName,
-        "' ",
-        getRunningTasksStatus()
+        "' to join #",
+        getNumberOfRunningTasks(), " currently running tasks"
       )
     ), file = log_file_path, append = TRUE)
     startAsyncTask(
@@ -180,9 +180,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
           stop(msg)
         }
       },
-      debug = debugFuture
+      debug = FALSE
     ) #end call to startAsyncTask
-    processRunningTasks(wait = FALSE, debug = TRUE)
+    processRunningTasks(wait = FALSE, debug = TRUE, maximumTasksToResolve=1)
   } #end loop over groups
 } #end for (naics_run_number in 1:nrow(naics_set))
 

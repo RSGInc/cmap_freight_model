@@ -270,8 +270,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
         Sys.time(),
         ": Submitting task '",
         taskName,
-        "' ",
-        getRunningTasksStatus()
+        "' to join #",
+        getNumberOfRunningTasks(), " currently running tasks"
       )
     ), file = log_file_path, append = TRUE)
 
@@ -351,10 +351,10 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         load(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".Rdata")))
 
-        if (!(naics %in% names(pmgoutputs))) {
-          pmgoutputs[[naics]] <<- list()
+        if (!(taskNaics %in% names(pmgoutputs))) {
+          pmgoutputs[[taskNaics]] <<- list()
         }
-        groupoutputs <- pmgoutputs[[naics]]
+        groupoutputs <- pmgoutputs[[taskNaics]]
         groupoutputs[[g]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
@@ -376,7 +376,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
             file.path(outputdir, paste0(taskNaics, ".Rdata"))
           load(naicsRDataFile)
           pairs <- rbindlist(groupoutputs)
-          pmgoutputs[[naics]] <<-
+          pmgoutputs[[taskNaics]] <<-
             NULL #delete naic from tracked outputs
           pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 
@@ -393,9 +393,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
         } #end if all groups in naic are finished
       },
       #end callback
-      debug = debugFuture
+      debug = FALSE
     ) #end call to startAsyncTask
-    processRunningTasks(wait = FALSE, debug = TRUE)
+    processRunningTasks(wait = FALSE, debug = TRUE, maximumTasksToResolve=1)
   }#end loop over groups
 } #end for (naics_run_number in 1:nrow(naics_set))
 
