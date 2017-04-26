@@ -218,7 +218,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
   pass <- 0			### counter for number of passes through function
   for (iSCTG in unique(df$Commodity_SCTG)){
-    print(paste(format(Sys.time()), "iSCTG: ",iSCTG))
+    print(paste(Sys.time(), "iSCTG: ",iSCTG))
 
 	###### Heither, 02-09-2016: Runmode==0 - use for initial cost file development and shipper select best mode --
 	if(runmode==0)	{
@@ -311,7 +311,7 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
       reqtomove <- prodconsgroup[mingroup]$consexcess
       maxsample <- nrow(consc[group==mingroup]) - 1 #leave at least one consumer in the group
       if (maxsample > 0){ #move consumers to other groups
-        print(paste(format(Sys.time()), "Moving Consumers:",mingroup,"to",maxgroup,reqtomove, maxsample))
+        print(paste(Sys.time(), "Moving Consumers:",mingroup,"to",maxgroup,reqtomove, maxsample))
         #create a sample frame of the first maxsample records and identify a set that is just over reqtomove
         sampsellers <- sample.int(maxsample)
         constomove <- consc[group==mingroup][sampsellers,list(BuyerID,PurchaseAmountTons)]
@@ -320,7 +320,7 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
         consc[BuyerID %in% constomove[PATCum>threshold]$BuyerID,group:=maxgroup]
       } else { #no consumers left to move from this group so move some producers to it -- opposite direction
         maxsampleprod <- nrow(prodc[group==maxgroupprod]) - 1
-        print(paste(format(Sys.time()), "Moving Producers:", maxgroupprod,"to",mingroup,reqtomove, maxsampleprod))
+        print(paste(Sys.time(), "Moving Producers:", maxgroupprod,"to",mingroup,reqtomove, maxsampleprod))
         #create a sample frame of the first maxsample records and identify a set that is just over reqtomove
         sampbuyers <- sample.int(maxsampleprod)
         prodstomove <- prodc[group==maxgroupprod][sampbuyers,list(SellerID,OutputCapacityTons)]
@@ -408,14 +408,14 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,iter=1){
 create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   starttime <- proc.time()
 
-  print(paste(format(Sys.time()), "Writing buy and sell files for ",naics,"group",g))
+  print(paste(Sys.time(), "Writing buy and sell files for ",naics,"group",g))
 
   #All consumers for this group write PMG input and create table for merging
   fwrite(consc[group==g,list(InputCommodity,BuyerID,Zone,NAICS,Size,OutputCommodity,PurchaseAmountTons,PrefWeight1_UnitCost,PrefWeight2_ShipTime,SingleSourceMaxFraction)],
             file = file.path(model$outputdir,paste0(naics, "_g", g, ".buy.csv")))
   conscg <- consc[group==g,list(InputCommodity,NAICS,Zone,Buyer.SCTG,BuyerID,Size,ConVal,PurchaseAmountTons)]
 
-  print(paste(format(Sys.time()), "Finished writing buy file for ",naics,"group",g))
+  print(paste(Sys.time(), "Finished writing buy file for ",naics,"group",g))
   #If splitting producers, write out each group and else write all with output capacity reduced
   if(sprod==1){
     fwrite(prodc[group==g,list(OutputCommodity,SellerID,Zone,NAICS,Size,OutputCapacityTons,NonTransportUnitCost)],
@@ -429,9 +429,9 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
               file = file.path(model$outputdir,paste0(naics, "_g", g, ".sell.csv")))
     prodcg <- prodc[,list(OutputCommodity,NAICS,Commodity_SCTG,SellerID,Size,Zone,OutputCapacityTons=OutputCapacityTonsG)]
   }
-  print(paste(format(Sys.time()), "Finished writing sell file for ",naics,"group",g))
+  print(paste(Sys.time(), "Finished writing sell file for ",naics,"group",g))
 
-  print(paste(format(Sys.time()), "Applying distribution, shipment, and mode-path models to",naics,"group",g))
+  print(paste(Sys.time(), "Applying distribution, shipment, and mode-path models to",naics,"group",g))
   # Rename ready to merge
   setnames(conscg, c("InputCommodity", "NAICS", "Zone","Size"), c("NAICS", "Buyer.NAICS", "Consumption_zone","Buyer.Size"))
   setnames(prodcg, c("OutputCommodity", "NAICS", "Zone","Size"),c("NAICS", "Seller.NAICS", "Production_zone","Seller.Size"))
@@ -440,7 +440,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   pc <- merge(prodcg,conscg,"NAICS", allow.cartesian = TRUE)
   pc <- pc[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
 
-  print(paste(format(Sys.time()), "Organizing data for distribution channel model"))
+  print(paste(Sys.time(), "Organizing data for distribution channel model"))
   #Distribution size model
   #buyer/seller attributes
 
@@ -464,7 +464,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   pc <- merge(pc, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
   setnames(pc, "GCD", "Distance")
 
-  print(paste(format(Sys.time()), "Applying distribution channel model"))
+  print(paste(Sys.time(), "Applying distribution channel model"))
   #Apply choice model of distribution channel and iteratively adjust the ascs
   #The model estimated for mfg products was applied to all other SCTG commodities
   inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
@@ -473,10 +473,10 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     pc_food <- pc[Commodity_SCTG %in% c(1:9),c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])),with=F]
     df <- pc_food[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])))] #unique combinations of model coefficients
     df[, eval(unique(distchan_food$VAR[distchan_food$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-    print(paste(format(Sys.time()), nrow(df), "unique combinations"))
+    print(paste(Sys.time(), nrow(df), "unique combinations"))
     pc[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_food, distchan_cal, distchan_calcats, 4)]
   }
-  print(paste(format(Sys.time()), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
+  print(paste(Sys.time(), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
   outNumber <- nrow(pc[!Commodity_SCTG %in% c(1:9)])
   if (outNumber > 0) {
     setkeyv(pc, c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"]))) #sorted on vars so simulated choice is ordered correctly
@@ -484,11 +484,11 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     df <- pc_mfg[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])))] #unique combinations of model coefficients
     ####do this in the function (seems unecessary here)?
     df[, eval(unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-    print(paste(format(Sys.time()), nrow(df), "unique combinations"))
+    print(paste(Sys.time(), nrow(df), "unique combinations"))
     pc[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_mfg, distchan_cal, distchan_calcats, 4)]
   }
   rm(df)
-  print(paste(format(Sys.time()), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
+  print(paste(Sys.time(), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
 
   ### -- Heither, 10-15-2015: Enforce Distribution channel logical consistency -- ###
   pc[distchannel==1 & Production_zone %in% c(179:180) & !Consumption_zone %in% c(179:180), distchannel := 3]				### -- Hawaii origin - non-Hawaii destination
@@ -496,7 +496,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   pc[distchannel==1 & Production_zone<=273 & Consumption_zone>273 & !Consumption_zone %in% c(310,399), distchannel := 3]	### -- U.S. origin - foreign destination (except Canada/Mexico)
   pc[distchannel==1 & Production_zone>273 & !Production_zone %in% c(310,399) & Consumption_zone<=273, distchannel := 3]		### -- foreign origin (except Canada/Mexico) - U.S. destination
 
-  print(paste(format(Sys.time()), "Organizing data for shipment size model"))
+  print(paste(Sys.time(), "Organizing data for shipment size model"))
   # Shipment size model
   # buyer/seller attributes
   pc[, log_dist := log10(Distance + 1)]
@@ -519,7 +519,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   ####it seems like the distribution channel model is also a problem here -- as each
   ####record really represents a different number of shipments, But we don't know that at time of application?
 
-  print(paste(format(Sys.time()), "Applying shipment size model..."))
+  print(paste(Sys.time(), "Applying shipment size model..."))
   inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
   if (inNumber > 0) {
     setkeyv(pc, c("Commodity_SCTG", unique(ShipSize_food$VAR[ShipSize_food$TYPE == "Variable"]))) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
@@ -527,10 +527,10 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     df <- pc_food[, list(Start = min(.I), Fin = max(.I)), by = eval(c("Commodity_SCTG", unique(ShipSize_food$VAR[ShipSize_food$TYPE == "Variable"])))] #unique combinations of model coefficients
     df[, eval(unique(ShipSize_food$VAR[ShipSize_food$TYPE == "Constant"])):=1] #add 1s for constants to each group in df
     setnames(df, "Commodity_SCTG", "CATEGORY")
-    print(paste(format(Sys.time()), nrow(df), "unique combinations"))
+    print(paste(Sys.time(), nrow(df), "unique combinations"))
     pc[Commodity_SCTG %in% c(1:9), ship_size := predict_logit(df, ShipSize_food, ShipSize_cal, ShipSize_calcats, 4)]
   }
-  print(paste(format(Sys.time()), "Finished 2 ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
+  print(paste(Sys.time(), "Finished 2 ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
   outNumber <- nrow(pc[!Commodity_SCTG %in% c(1:9)])
   if (outNumber > 0) {
     setkeyv(pc, c("Commodity_SCTG", unique(ShipSize_mfg$VAR[ShipSize_mfg$TYPE == "Variable"]))) #sorted on vars so simulated choice is ordered correctly
@@ -539,15 +539,15 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     setnames(df, "Commodity_SCTG", "CATEGORY")
     ####do this in the function (seems unecessary here)?
     df[, eval(unique(ShipSize_mfg$VAR[ShipSize_mfg$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-    print(paste(format(Sys.time()), nrow(df), "unique combinations"))
+    print(paste(Sys.time(), nrow(df), "unique combinations"))
     pc[!Commodity_SCTG %in% c(1:9), ship_size := predict_logit(df, ShipSize_mfg, ShipSize_cal, ShipSize_calcats, 4)]
   }
   rm(df)
-  print(paste(format(Sys.time()), "Finished 2 ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
+  print(paste(Sys.time(), "Finished 2 ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
 
   #Simulate the actual shipment weight
   # The probabilities are based on data from the CFS and texas
-  print(paste(format(Sys.time()), "Simulating the actual shipment weight"))
+  print(paste(Sys.time(), "Simulating the actual shipment weight"))
   pc[, temprand := runif(.N)]
   pc[, weight := 0L]
   #pc[, weight := as.double(weight)]
@@ -559,7 +559,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     pc[ship_size == 1 & Commodity_SCTG == i, weight := c(50L, 75L, 300L, 625L, 875L)[1 + findInterval(temprand, as.numeric(unlist(ship1[i])))]]
     pc[ship_size == 3 & Commodity_SCTG == i, weight := c(30000L, 75000L, 150000L)[1 + findInterval(temprand, as.numeric(unlist(ship3[i])))]]
   }
-  print(paste(format(Sys.time()), "Finished loop for(i in unique(pc$Commodity_SCTG)) length=", length(uniqueIndexes)))
+  print(paste(Sys.time(), "Finished loop for(i in unique(pc$Commodity_SCTG)) length=", length(uniqueIndexes)))
   ### --  for(i in unique(pc$Commodity_SCTG)){
 ### --     pc[ship_size == 1 & Commodity_SCTG == i, weight := c(50L, 75L, 300L, 625L, 875L)[1 + findInterval(temprand, ShipSize_cal$TARGET[ShipSize_cal$CATEGORY == paste0("x", i) & ShipSize_cal$CHOICE == 1])]]
 ### --     pc[ship_size == 3 & Commodity_SCTG == i, weight := c(30000L, 75000L, 150000L)[1 + findInterval(temprand, ShipSize_cal$TARGET[ShipSize_cal$CATEGORY == paste0("x", i) & ShipSize_cal$CHOICE == 3])]]
@@ -579,7 +579,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #Each shipper-receiver pair selects one transport & logistics path for its shipping needs based on annual transport & logistics costs
   ## ---------------------------------------------------------------
   ## Heither, revised 07-22-2015
-  print(paste(format(Sys.time()), "Applying the mode-path choice model"))
+  print(paste(Sys.time(), "Applying the mode-path choice model"))
   setkey(pc, Production_zone, Consumption_zone)
   pc[, lssbd := ifelse(Seller.Size > 5 & Buyer.Size < 3 & Distance > 300, 1, 0)]
   #Add "MinGmnql","MinPath","Attribute2_ShipTime" to pc using the minLogisticsCost function
@@ -604,7 +604,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   ## ---------------------------------------------------------------
 
   #Prepare and write the cost file
-  print(paste(format(Sys.time()), "Preparing and writing the costs file for",naics))
+  print(paste(Sys.time(), "Preparing and writing the costs file for",naics))
 
   #save the full table to an rdata file for use after the PMG game
   save(pc, file = file.path(model$outputdir,paste0(naics, "_g", g, ".Rdata")))
@@ -648,7 +648,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   rm(pc,prodcg,conscg)
   gc()
 
-  print(paste(format(Sys.time()), "Complete for", naics, "group", g, "in", (proc.time() - starttime)[3]))
+  print(paste(Sys.time(), "Complete for", naics, "group", g, "in", (proc.time() - starttime)[3]))
 }
 
 #save current workspace for use by seperate R script processes for running NAICS groups
