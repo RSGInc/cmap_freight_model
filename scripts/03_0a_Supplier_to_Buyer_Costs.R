@@ -169,7 +169,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
         groupoutputs[[taskInfo$taskGroup]] <-
-          pasteo(Sys.time(), ": Finished!")
+          paste0(Sys.time(), ": Finished!")
 
         costs_file_path <-
           file.path(outputdir,
