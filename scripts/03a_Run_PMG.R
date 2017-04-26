@@ -397,18 +397,6 @@ for (naics_run_number in 1:nrow(naics_set)) {
           save(consc, prodc, pairs, file = naicsRDataFile)
           rm(consc, prodc, pairs)
 
-          write(print(
-            paste0(
-              Sys.time(),
-              ": Completed Processing Outputs of all ",
-              taskInfo$taskGroups,
-              " groups for naics ",
-              taskInfo$taskNaics,
-              ". Remaining naicsInProcess=",
-              paste0(collapse=", ", names(naicsInProcess))
-            )
-          ), file = task_log_file_path, append = TRUE)
-
           #delete naic from tracked outputs
           naicsInProcess[[naicsKey]] <<- NULL
 
