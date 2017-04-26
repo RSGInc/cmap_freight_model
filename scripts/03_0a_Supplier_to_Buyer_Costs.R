@@ -179,6 +179,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
         groupoutputs[[groupKey]] <-
           paste0(Sys.time(), ": Finished!")
 
+        #don't understand why this is necessary but apparently have to re-store list
+        naicsInProcess[[naicsKey]] <<- groupoutputs
+
         costs_file_path <-
           file.path(outputdir,
                     paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".costs.csv"))
