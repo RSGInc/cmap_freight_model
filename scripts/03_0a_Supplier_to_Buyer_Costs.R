@@ -38,6 +38,9 @@ plan(multiprocess,
      workers = model$scenvars$maxcostrscripts)
 ########################################
 
+#list to hold the group outputs for any currently running naics
+naicsInProcess <- list()
+
 load(file.path(outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
@@ -53,7 +56,6 @@ if (nrow(naics_set) != length(model$scenvars$pmgnaicstorun)) {
   )
 }
 
-naicsInProcess <- list()
 
 for (naics_run_number in 1:nrow(naics_set)) {
   naics <- naics_set$NAICS[naics_run_number]
@@ -65,6 +67,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
   file.create(log_file_path)
 
   naicsInProcess[[naics]] <- list() #create place to accumulate group results
+  print(paste0('in outer loop names(naicsInProcess): ', paste0(collapse=", ", names(naicsInProcess))))
+  flush.console()
 
   write(print(
     paste0(
@@ -168,6 +172,12 @@ for (naics_run_number in 1:nrow(naics_set)) {
           file.path(outputdir, paste0(taskInfo$taskNaics, "_PMGRun_Log.txt"))
 
         groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
+        if (is.null(groupoutputs)) {
+          stop(paste0("for taskInfo$taskNaics ", taskInfo$taskNaics, " naicsInProcess[[taskInfo$taskNaics]] (groupoutputs) is NULL! "))
+        }
+        print(paste0('in callback names(naicsInProcess): ', paste0(collapse=", ", names(naicsInProcess))))
+        flush.console()
+
         groupoutputs[[taskInfo$taskGroup]] <-
           paste0(Sys.time(), ": Finished!")
 
@@ -183,7 +193,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
             ", Elapsed time since submitted: ",
             asyncResults[["elapsedTime"]],
             ", cost_file_exists: ",
-            cost_file_exists
+            cost_file_exists,
+            " # of group results so far for this naics=", length(groupoutputs)
           )
         ),
         file = task_log_file_path,
@@ -203,7 +214,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
               Sys.time(),
               ": Completed Processing Outputs of all ",
               taskInfo$taskGroups,
-              " groups for naics ", taskInfo$taskNaics
+              " groups for naics ",
+              taskInfo$taskNaics,
+              ". Remaining naicsInProcess=", paste0(collapse=", ", names(naicsInProcess))
             )
           ), file = task_log_file_path, append = TRUE)
         } #end if all groups in naic are finished
