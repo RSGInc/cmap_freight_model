@@ -178,8 +178,14 @@ for (naics_run_number in 1:nrow(naics_set)) {
         print(paste0('in callback names(naicsInProcess): ', paste0(collapse=", ", names(naicsInProcess))))
         flush.console()
 
-        groupoutputs[[taskInfo$taskGroup]] <-
+        groupoutputs[[paste0("group-",taskInfo$taskGroup)]] <-
           paste0(Sys.time(), ": Finished!")
+        print(paste0('in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
+        flush.console()
+
+        groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
+        print(paste0(' after retrieval in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
+        flush.console()
 
         costs_file_path <-
           file.path(outputdir,

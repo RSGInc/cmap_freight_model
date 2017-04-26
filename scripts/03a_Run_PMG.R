@@ -361,7 +361,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
         load(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".Rdata")))
 
         groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
-        groupoutputs[[taskInfo$taskGroup]] <-
+        groupoutputs[[paste0("group-",taskInfo$taskGroup)]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
         rm(pmgout, pc)
