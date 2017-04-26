@@ -365,6 +365,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
         groupoutputs[[paste0("group-",taskInfo$taskGroup)]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
+        #Don't think I should have to do this it seems I must but re-store list in global
+        naicsInProcess[[naicsKey]] <<- groupoutputs
+
         rm(pmgout, pc)
         write(print(paste0(Sys.time(),
                      ": Deleting Inputs: ",

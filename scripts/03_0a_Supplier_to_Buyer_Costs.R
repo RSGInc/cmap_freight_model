@@ -179,11 +179,13 @@ for (naics_run_number in 1:nrow(naics_set)) {
         print(paste0('in callback names(naicsInProcess): ', paste0(collapse=", ", names(naicsInProcess))))
         flush.console()
 
-        groupoutputs[[paste0("group-",taskInfo$taskGroup)]] <-
+        groupKey <- paste0("group-",taskInfo$taskGroup)
+        groupoutputs[[groupKey]] <-
           paste0(Sys.time(), ": Finished!")
         print(paste0('in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
         flush.console()
 
+        naicsInProcess[[naicsKey]] <<- groupoutputs #should not have to do this but re-store list in global
         groupoutputs <- naicsInProcess[[naicsKey]]
         print(paste0(' after retrieval in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
         flush.console()
