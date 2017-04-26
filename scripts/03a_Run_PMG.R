@@ -21,6 +21,14 @@ setwd(basedir)
 #load the pmg workspace
 load(file.path(outputdir, "PMG_Workspace.Rdata"))
 
+#https://github.com/tdhock/namedCapture
+if (!require(namedCapture)) {
+  if (!require(devtools)) {
+    install.packages("devtools")
+  }
+  devtools::install_github("tdhock/namedCapture")
+}
+library(namedCapture)
 
 library(rFreight, lib.loc = "./library/")
 loadPackage("data.table")
@@ -299,16 +307,15 @@ for (naics_run_number in 1:nrow(naics_set)) {
         #                        caughtWarning)
 
         taskName <- asyncResults[["asyncTaskName"]]
-        naics_and_group_string <-
-          gsub("^.*naics[-]([^_]+)_group[-]([^_]+)_.*$",
-               "\\1 \\2",
-               taskName)
-        naics_and_group <-
-          strsplit(naics_and_group_string, split = " ")[[1]]
-        taskNaics <- naics_and_group[[1]]
-        taskGroup <- naics_and_group[[2]]
+        taskInfo <-
+          data.table::data.table(
+            namedCapture::str_match_named(
+              taskName,
+              "^.*naics[-](?<taskNaics>[^_]+)_group-(?<taskGroup>[^_]+)_of_(?<taskGroups>[^_]+)_sprod-(?<sprod>.*)$"
+            )
+          )[1, ]
         task_log_file_path <-
-          file.path(outputdir, paste0(taskNaics, "_PMGRun_Log.txt"))
+          file.path(outputdir, paste0(taskInfo$taskNaics, "_PMGRun_Log.txt"))
 
                 write(print(
           paste0(
@@ -321,7 +328,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
         ), file = task_log_file_path, append = TRUE)
 
         expectedOutputFile <-
-          file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".out.csv"))
+          file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".out.csv"))
         if (!file.exists(expectedOutputFile)) {
           msg <- paste0(
             Sys.time(),
@@ -349,34 +356,34 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         pmgout[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
 
-        load(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".Rdata")))
+        load(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".Rdata")))
 
-        if (!(taskNaics %in% names(pmgoutputs))) {
-          pmgoutputs[[taskNaics]] <<- list()
+        if (!(taskInfo$taskNaics %in% names(pmgoutputs))) {
+          pmgoutputs[[taskInfo$taskNaics]] <<- list()
         }
-        groupoutputs <- pmgoutputs[[taskNaics]]
+        groupoutputs <- pmgoutputs[[taskInfo$taskNaics]]
         groupoutputs[[g]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
         rm(pmgout, pc)
         write(print(paste0(Sys.time(),
                      ": Deleting Inputs: ",
-                     taskNaics,
+                     taskInfo$taskNaics,
                      " Group: ",
-                     taskGroup)), file=task_log_file_path, append=TRUE)
+                     taskInfo$taskGroup)), file=task_log_file_path, append=TRUE)
 
-        file.remove(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".costs.csv")))
-        file.remove(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".buy.csv")))
-        file.remove(file.path(outputdir, paste0(taskNaics, "_g", taskGroup, ".sell.csv")))
+        file.remove(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".costs.csv")))
+        file.remove(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".buy.csv")))
+        file.remove(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".sell.csv")))
 
-        if (length(groupoutputs) == groups) {
+        if (length(groupoutputs) == taskInfo$taskGroups) {
           #convert output list to one table, add to workspace, and save
           #apply fix for bit64/data.table handling of large integers in rbindlist
           naicsRDataFile <-
-            file.path(outputdir, paste0(taskNaics, ".Rdata"))
+            file.path(outputdir, paste0(taskInfo$taskNaics, ".Rdata"))
           load(naicsRDataFile)
           pairs <- rbindlist(groupoutputs)
-          pmgoutputs[[taskNaics]] <<-
+          pmgoutputs[[taskInfo$taskNaics]] <<-
             NULL #delete naic from tracked outputs
           pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 
@@ -386,7 +393,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
             paste0(
               Sys.time(),
               ": Completed Processing Outputs of all ",
-              groups,
+              taskInfo$taskGroups,
               " groups"
             )
           ), file = task_log_file_path, append = TRUE)
