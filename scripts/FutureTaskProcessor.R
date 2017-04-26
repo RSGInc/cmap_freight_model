@@ -187,7 +187,7 @@ processRunningTasks <-
               asyncTaskName,
               "' and there are ",
               getNumberOfRunningTasks(),
-              " additional task still running.",
+              " additional tasks still running.",
               # " submitTime: ",
               # submitTime,
               # ", endTime: ",
