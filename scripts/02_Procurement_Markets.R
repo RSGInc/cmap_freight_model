@@ -272,6 +272,8 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
   # sort by sizes
   setkey(consc, Size)
   setkey(prodc, Size)
+
+  print(paste0("create_pmg_sample_groups(naics=", naics, ", groups=", groups, ", sprod=", sprod, ") called. nrow(consc)=", nrow(consc), " nrow(prodc)=", nrow(prodc)))
   #add group id and number of groups to consc and prodc; if not splitting producers assign 0
   consc[,numgroups:=groups]
   prodc[,numgroups:=groups]
