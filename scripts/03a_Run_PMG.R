@@ -223,7 +223,7 @@ runPMGLocal <-
 
   } #end runPMGLocal
 
-#list to hold the summarized outputs, file to hold timings
+#list to hold the group outputs for any currently running naics
 pmgoutputs <- list()
 
 load(file.path(outputdir, "naics_set.Rdata"))
@@ -262,6 +262,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
   ),
   file = log_file_path,
   append = TRUE)
+
+  pmgoutputs[[naics]] <<- list() #create place to accumulate group results
 
   #loop over the groups and run the games, and process outputs
   for (g in 1:groups) {
@@ -358,11 +360,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         load(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".Rdata")))
 
-        if (!(taskInfo$taskNaics %in% names(pmgoutputs))) {
-          pmgoutputs[[taskInfo$taskNaics]] <<- list()
-        }
         groupoutputs <- pmgoutputs[[taskInfo$taskNaics]]
-        groupoutputs[[g]] <-
+        groupoutputs[[taskInfo$taskGroup]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
         rm(pmgout, pc)
@@ -394,7 +393,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
               Sys.time(),
               ": Completed Processing Outputs of all ",
               taskInfo$taskGroups,
-              " groups"
+              " groups for naics ", taskInfo$taskNaics
             )
           ), file = task_log_file_path, append = TRUE)
         } #end if all groups in naic are finished

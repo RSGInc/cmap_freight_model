@@ -14,6 +14,15 @@ setwd(basedir)
 #load the pmg workspace
 load(file.path(outputdir, "PMG_Workspace.Rdata"))
 
+#https://github.com/tdhock/namedCapture
+if (!require(namedCapture)) {
+  if (!require(devtools)) {
+    install.packages("devtools")
+  }
+  devtools::install_github("tdhock/namedCapture")
+}
+library(namedCapture)
+
 #load required packages
 library(rFreight, lib.loc = "./library/")
 loadPackage("data.table")
@@ -43,6 +52,9 @@ if (nrow(naics_set) != length(model$scenvars$pmgnaicstorun)) {
     )
   )
 }
+
+naicsInProcess <- list()
+
 for (naics_run_number in 1:nrow(naics_set)) {
   naics <- naics_set$NAICS[naics_run_number]
   groups <- naics_set$groups[naics_run_number]
@@ -51,6 +63,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
   log_file_path <-
     file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt"))
   file.create(log_file_path)
+
+  naicsInProcess[[naics]] <<- list() #create place to accumulate group results
 
   write(print(
     paste0(
@@ -73,8 +87,6 @@ for (naics_run_number in 1:nrow(naics_set)) {
   if (!"group" %in% names(prodc))
     create_pmg_sample_groups(naics, groups, sprod)
 
-
-  runningTasks <- list()
 
   #loop over the groups and prepare the files for running the games
   for (g in 1:groups) {
@@ -145,19 +157,23 @@ for (naics_run_number in 1:nrow(naics_set)) {
         #                        caughtWarning)
         #check that cost files was create
         taskName <- asyncResults[["asyncTaskName"]]
-        naics_and_group_string <-
-          gsub("^.*naics[-]([^_]+)_group[-]([^_]+)_.*$",
-               "\\1 \\2",
-               taskName)
-        naics_and_group <-
-          strsplit(naics_and_group_string, split = " ")[[1]]
-        taskNaics <- naics_and_group[[1]]
-        taskGroup <- naics_and_group[[2]]
+        taskInfo <-
+          data.table::data.table(
+            namedCapture::str_match_named(
+              taskName,
+              "^.*naics[-](?<taskNaics>[^_]+)_group-(?<taskGroup>[^_]+)_of_(?<taskGroups>[^_]+)_sprod-(?<sprod>.*)$"
+            )
+          )[1, ]
         task_log_file_path <-
-          file.path(outputdir, paste0(taskNaics, "_PMGRun_Log.txt"))
+          file.path(outputdir, paste0(taskInfo$taskNaics, "_PMGRun_Log.txt"))
+
+        groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
+        groupoutputs[[taskInfo$taskGroup]] <-
+          pasteo(Sys.time(), ": Finished!")
+
         costs_file_path <-
           file.path(outputdir,
-                    paste0(taskNaics, "_g", taskGroup, ".costs.csv"))
+                    paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".costs.csv"))
         cost_file_exists <- file.exists(costs_file_path)
         write(print(
           paste0(
@@ -179,6 +195,18 @@ for (naics_run_number in 1:nrow(naics_set)) {
           write(print(msg), file = task_log_file_path, append = TRUE)
           stop(msg)
         }
+        if (length(groupoutputs) == taskInfo$taskGroups) {
+          naicsInProcess[[taskInfo$taskNaics]] <<-
+            NULL #delete naic from tracked outputs
+          write(print(
+            paste0(
+              Sys.time(),
+              ": Completed Processing Outputs of all ",
+              taskInfo$taskGroups,
+              " groups for naics ", taskInfo$taskNaics
+            )
+          ), file = task_log_file_path, append = TRUE)
+        } #end if all groups in naic are finished
       },
       debug = FALSE
     ) #end call to startAsyncTask
@@ -188,5 +216,12 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
 #wait until all tasks are finished
 processRunningTasks(wait = TRUE, debug = TRUE)
+
+if (length(naicsInProcess) != 0) {
+  stop(paste(
+    "At end of 03_0a_Supplier_to_Buyer_Costs.R there were still some unfinished naics! Unfinished: ",
+    paste0(collapse = ", ", names(naicsInProcess))
+  ))
+}
 
 quit(save = "no", status = 0) #set status
