@@ -1,0 +1,1561 @@
+---
+title: "CMAP Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+    theme: yeti
+    source_code: embed
+    css: "CMAPDashboard.css"
+---
+
+```{r loadPackages,echo=FALSE}
+loadPackages <- function (packages, lib = NULL, suppressMessages = TRUE, suppressWarnings = FALSE) 
+{
+    notinstalled <- packages[!packages %in% .packages(all.available = TRUE, 
+        lib.loc = lib)]
+    if (length(notinstalled) > 0) 
+        install.packages(notinstalled, repos = "http://cran.r-project.org", 
+            dependencies = TRUE, lib = lib)
+    for (package in packages) {
+        library.expression <- paste0("library(", package, ", lib = lib)")
+        if (suppressMessages) 
+            library.expression <- paste0("suppressMessages(", 
+                library.expression, ")")
+        if (suppressWarnings) 
+            library.expression <- paste0("suppressWarnings(", 
+                library.expression, ")")
+        eval(parse(text = library.expression))
+    }
+    invisible(TRUE)
+}
+
+SYSTEM_REPORT_PKGS <- c("DT", "flexdashboard", "leaflet", "geojsonio", "htmltools", "htmlwidgets",
+                        "knitr", "mapview", "plotly", "RColorBrewer", "rgdal", "rgeos",
+                        "rmarkdown", "scales", "stringr", "jsonlite", "pander","RSGFAF","data.table","circlize","formattable")
+SYSTEM_APP_PATH       <- getwd()
+
+loadPackages(SYSTEM_REPORT_PKGS)
+
+```
+
+```{r Setup}
+opts_knit$set(root.dir = SYSTEM_APP_PATH)
+```
+
+
+```{r Common_Values}
+# Mapping of States to Regions & Subregions
+
+stateRegion <- data.table(State = c("Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming","District of Columbia"),
+                          Region = c("South","West","West","South","West","West","NorthEast","South","South","South","West","West","MidWest","MidWest","MidWest","MidWest","South","South","NorthEast","South","NorthEast","MidWest","MidWest","South","MidWest","West","MidWest","West","NorthEast","NorthEast","West","NorthEast","South","MidWest","MidWest","South","West","NorthEast","NorthEast","South","MidWest","South","South","West","NorthEast","South","West","South","MidWest","West","South"),
+                          SubRegion=c("East South Central","Pacific","Mountain","West South Central","Pacific","Mountain","New England","South Atlantic","South Atlantic","South Atlantic","Pacific","Mountain","East North Central","East North Central","West North Central","West North Central","East South Central","West South Central","New England","South Atlantic","New England","East North Central","West North Central","East South Central","West North Central","Mountain","West North Central","Mountain","New England","Middle Atlantic","Mountain","Middle Atlantic","South Atlantic","West North Central","East North Central","West South Central","Pacific","Middle Atlantic","New England","South Atlantic","West North Central","East South Central","West South Central","Mountain","New England","South Atlantic","Pacific","South Atlantic","East North Central","Mountain","South Atlantic"),stringsAsFactors = FALSE, key = "State")
+
+```
+
+```{r ggplot_Theme}
+theme_db <- theme_bw() + theme(plot.margin = unit(c(10,10,20,10),"pt")) + theme(strip.background = element_rect(fill = "white")) # this should eventually be replaced with an RSG theme, which can be substituted for client themes in conjunction with the dashboard's css file in the YAML header
+```
+
+
+
+Overview
+============================================
+
+Summary {data-width=200}
+--------------------------------------------
+
+### About this Document
+
+This document is stand-alone interactive dashboard viewable from most modern Internet browsers. The dashboard is meant to be a high-level summary of an __rFreight__ scenario. All of the data, charts, and maps viewable in this dashboard are embedded directly into the HTML file, so users are encouraged to share their scenario results with others via this document. An Internet connection is necessary for the best user experience, but is not required.
+
+Users may navigate to different areas of the dashboard using the navigation bar at the top of the page, and may interact directly with most tables, charts, and maps.
+
+This document is best viewed using the most recent versions of the following web browsers:
+
+* [Google Chrome](https://www.google.com/chrome/browser/desktop/)
+* [Mozilla Firefox](https://www.mozilla.org/en-US/firefox/new/)
+* [Microsoft Internet Explorer](https://www.microsoft.com/en-us/download/internet-explorer.aspx)
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Run Date
+
+```{r Run_Date_ValueBox}
+valueBox(Sys.Date(), "Model Run Date", icon = "fa-calendar")
+```
+
+
+
+```{r setupColors, echo=FALSE}
+# Setup default colors at the beginning (WIP)
+rsgcolordf <- data.frame(red=c(246,0,99,186,117,255,82), green=c(139,111,175,18,190,194,77), blue=c(31,161,94,34,233,14,133), colornames=c("orange","marine","leaf","cherry","sky","sunshine","violet"))
+
+rsgcolordf <- rsgcolordf %>% mutate(hexValue=rgb(red,green,blue,maxColorValue=255))
+
+makeMoreColors <- colorRampPalette(rsgcolordf$hexValue) # Combines RSG colors to form more colors
+
+modeColors <- data.table(mode=c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None"),colors=makeMoreColors(8),stringsAsFactors = FALSE,key = "mode")
+
+modeColors2 <- makeMoreColors(8)
+names(modeColors2) <- c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None")
+
+dataColor <- makeMoreColors(2)
+names(dataColor) <- c("FAF 2012","Model")
+
+
+```
+
+```{r setVariables, echo=FALSE}
+selectYear <- 2012 # For filtering years in future
+CMAPFAFCodes <- c(171,181)
+lbstoTons <- 0.0005 # Convert from lbs to tons
+# Load MesoZone to FAF zone mapping
+mesoFAFCBPMap <- fread("meso_faf_map.csv")
+setkey(mesoFAFCBPMap,MESOZONE)
+# Load mode mapping
+modeCategories <- fread("mode_description.csv",stringsAsFactors = FALSE)
+setkey(modeCategories,ModeNumber)
+```
+
+
+```{r loadData, echo=FALSE, warning=FALSE,include=FALSE}
+# Load observed data and model data in this section
+
+#####################################################################
+######## Observed Data ##############################################
+#####################################################################
+Flows <- suppressWarnings(getFAFData(year = selectYear))
+## Note: Observed that some tonmiles are 0 while tons are greater than 0.
+
+Flows[,':='(Move.Type=ifelse(Origin.Domestic==Destination.Domestic,"Within Zones","Between Zones"))]
+
+Flows[,':='(Origin.Region=stateRegion[.(Origin.State),Region],
+            Origin.SubRegion=stateRegion[.(Origin.State),SubRegion],
+            Destination.Region=stateRegion[.(Destination.State),Region],
+            Destination.SubRegion=stateRegion[.(Destination.State),SubRegion])]
+
+CMAPFlows <- Flows[Origin.Domestic %in% CMAPFAFCodes | Destination.Domestic %in% CMAPFAFCodes]
+
+CMAPFlows[,':='(Move.Type=ifelse(Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,"Within",ifelse(Origin.Domestic %in% CMAPFAFCodes, "Out","In")))]
+
+CMAPFlows[,':='(Origin.Region=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.Region),
+                Origin.SubRegion=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.SubRegion),
+                Destination.Region=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.Region),
+                Destination.SubRegion=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.SubRegion))]
+
+#####################################################################
+######## Model Data ##############################################
+#####################################################################
+
+file_location <- "../scenarios/base/outputs/pairs.Rdata"
+# Check if it's an old file
+isOld <- ifelse(grepl("old",file_location),TRUE,FALSE)
+
+load(file_location)
+
+
+FAFZonescurrentVersion <- FAFZones[Version==getLatestFAFVersion()]
+FAFZonescurrentVersion[,Version:=NULL]
+FAFZonescurrentVersion[,State:=as.character(State)]
+setkey(FAFZonescurrentVersion,FAFZone)
+ModelFlows <- pairs
+rm(pairs)
+gc()
+
+# To match the with the older version
+if(isOld){setnames(ModelFlows,old=c("pzone","czone","SCTG"),new = c("Production_zone","Consumption_zone","Commodity_SCTG"))}
+
+ModelFlows[,c("Tons","Tonmiles","Value","Trade.Type"):=.(Last.Iteration.Quantity*lbstoTons,Last.Iteration.Quantity*lbstoTons*Distance,Last.Iteration.Quantity*ConVal/PurchaseAmountTons,ifelse(Production_zone<=273 & Consumption_zone<=273,"Domestic",ifelse(Production_zone<=273,"Export","Import")))]
+
+
+# Assign FAF zones to origin and destination
+ModelFlows[,":="(Origin.Domestic=ifelse(Trade.Type!="Import",mesoFAFCBPMap[.(Production_zone),FAFZONE],NA),
+            Origin.Foreign=ifelse(Trade.Type=="Import",mesoFAFCBPMap[.(Production_zone),FAFZONE],NA),
+            Destination.Domestic=ifelse(Trade.Type!="Export",mesoFAFCBPMap[.(Consumption_zone),FAFZONE],NA),
+            Destination.Foreign=ifelse(Trade.Type=="Export",mesoFAFCBPMap[.(Consumption_zone),FAFZONE],NA))]
+
+# Assign states to origin and destination
+ModelFlows[,":="(Origin.State=ifelse(Trade.Type!="Import",FAFZonescurrentVersion[.(Origin.Domestic),State],NA),Destination.State=ifelse(Trade.Type!="Export",FAFZonescurrentVersion[.(Destination.Domestic),State],NA))]
+
+ModelFlows[,':='(Origin.Region=stateRegion[.(Origin.State),Region],
+            Origin.SubRegion=stateRegion[.(Origin.State),SubRegion],
+            Destination.Region=stateRegion[.(Destination.State),Region],
+            Destination.SubRegion=stateRegion[.(Destination.State),SubRegion])]
+
+ModelFlows[,Mode.Domestic:=ifelse(Trade.Type=="Domestic",modeCategories[.(MinPath),Mode],NA)]
+
+ModelCMAPFlows <- ModelFlows[Origin.Domestic %in% CMAPFAFCodes | Destination.Domestic %in% CMAPFAFCodes]
+
+ModelCMAPFlows[,':='(Move.Type=ifelse(Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,"Within",ifelse(Origin.Domestic %in% CMAPFAFCodes, "Out","In")))]
+
+ModelFlows[,':='(Move.Type=ifelse(Origin.Domestic==Destination.Domestic,"Within Zones","Between Zones"))]
+
+ModelCMAPFlows[,':='(Origin.Region=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.Region),
+                Origin.SubRegion=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.SubRegion),
+                Destination.Region=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.Region),
+                Destination.SubRegion=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.SubRegion))]
+
+
+
+
+```
+
+
+Tables {data-navmenu="CMAP" data-width=200 .tabset .tabset-fade}
+==================================================================
+
+### Tonnage
+```{r createTablesCMAP, echo=FALSE}
+DomesticCMAPFlows <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Move.Type,Mode.Domestic)][order(Move.Type,-Tonnage)]
+
+ModelDomesticCMAPFlows <- ModelCMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Move.Type,Mode.Domestic)]
+
+DomesticCMAPFlows <- rbind(DomesticCMAPFlows,ModelDomesticCMAPFlows)
+rm(ModelDomesticCMAPFlows)
+
+DomesticCMAPFlows.T <- dcast(DomesticCMAPFlows,Mode.Domestic~Move.Type+Table,value.var = "Tonnage")
+DomesticCMAPFlows.V <- dcast(DomesticCMAPFlows,Mode.Domestic~Move.Type+Table,value.var = "Value")
+DomesticCMAPFlows.TM <- dcast(DomesticCMAPFlows,Mode.Domestic~Move.Type+Table,value.var = "Tonmiles")
+
+
+ImpExpDomesticCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Domestic)][order(Trade.Type,Move.Type,-Tonnage)]
+
+###########################################################
+#### Commented out until the foreign and domestic modes are decided
+###########################################################
+
+# ModelImpExpDomesticCMAPFlows <- ModelCMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Trade.Type,Move.Type,Mode.Domestic)][order(Trade.Type,Move.Type,-Tonnage)]
+# 
+# ImpExpDomesticCMAPFlows <- rbind(ImpExpDomesticCMAPFlows,ModelImpExpDomesticCMAPFlows)
+# rm(ModelImpExpDomesticCMAPFlows)
+
+ImpExpDomesticCMAPFlows.T <- dcast(ImpExpDomesticCMAPFlows,Mode.Domestic~Trade.Type+Move.Type,value.var="Tonnage")
+ImpExpDomesticCMAPFlows.V <- dcast(ImpExpDomesticCMAPFlows,Mode.Domestic~Trade.Type+Move.Type,value.var="Value")
+ImpExpDomesticCMAPFlows.TM <- dcast(ImpExpDomesticCMAPFlows,Mode.Domestic~Trade.Type+Move.Type,value.var="Tonmiles")
+
+ImpExpInternationalCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000),by=.(Trade.Type,Move.Type,Mode.Foreign)][order(Trade.Type,Move.Type,-Tonnage)]
+
+###########################################################
+#### Commented out until the foreign and domestic modes are decided
+###########################################################
+
+# ModelImpExpDomesticCMAPFlows <- ModelCMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Trade.Type,Move.Type,Mode.Foreign)][order(Trade.Type,Move.Type,-Tonnage)]
+# 
+# ImpExpDomesticCMAPFlows <- rbind(ImpExpDomesticCMAPFlows,ModelImpExpDomesticCMAPFlows)
+# rm(ModelImpExpDomesticCMAPFlows)
+
+ImpExpInternationalCMAPFlows.T <- dcast(ImpExpInternationalCMAPFlows,Mode.Foreign~Trade.Type+Move.Type,value.var="Tonnage")
+ImpExpInternationalCMAPFlows.V <- dcast(ImpExpInternationalCMAPFlows,Mode.Foreign~Trade.Type+Move.Type,value.var="Value")
+ImpExpInternationalCMAPFlows.TM <- dcast(ImpExpInternationalCMAPFlows,Mode.Foreign~Trade.Type+Move.Type,value.var="Tonmiles")
+
+TotalFlowsCMAP.T <- merge(merge(DomesticCMAPFlows.T,ImpExpDomesticCMAPFlows.T,by="Mode.Domestic"),ImpExpInternationalCMAPFlows.T,by.x="Mode.Domestic",by.y="Mode.Foreign")
+TotalFlowsCMAP.V <- merge(merge(DomesticCMAPFlows.V,ImpExpDomesticCMAPFlows.V,by="Mode.Domestic"),ImpExpInternationalCMAPFlows.V,by.x="Mode.Domestic",by.y="Mode.Foreign")
+TotalFlowsCMAP.TM <- merge(merge(DomesticCMAPFlows.TM,ImpExpDomesticCMAPFlows.TM,by="Mode.Domestic"),ImpExpInternationalCMAPFlows.TM,by.x="Mode.Domestic",by.y="Mode.Foreign")
+
+
+
+
+sketchCMAP <- with(tags,table(
+    thead(
+        tr(
+            th(colspan=1,rowspan=4,"Mode"),
+            th(colspan=5,rowspan=2, "Domesitc"),
+            th(colspan=6, "Domestic"),
+            th(colspan=6, "International")
+          ),
+        tr(
+            th(colspan=3, "Import"),
+            th(colspan=3, "Export"),
+            th(colspan=3, "Import"),
+            th(colspan=3, "Export")
+        ),
+        tr(
+            th(colspan=2, "In"),
+            th(colspan=2, "Out"),
+            th(colspan=1, "Within"),
+            lapply(rep(c("In","Out","Within"),4),th)
+        ),
+        tr(
+          lapply(rep(c("FAF 2012","Model"),2),th),
+          lapply(rep("FAF 2012",13),th)
+        )
+        )))
+
+
+# Function to create css style colors
+createCSSColors <- function(x,min.color,max.color,...){
+  clrs <- gradient(x,min.color,max.color,...)
+  clrs <- paste("rgb(",apply(t(clrs),1,paste,collapse=","),")",sep="")
+  return(clrs)
+}
+
+datatable(TotalFlowsCMAP.T,container=sketchCMAP,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:18,currency="",digits=0) %>% formatStyle(columns=2:18,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:18]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:18])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+
+
+
+```
+
+
+### Value
+
+```{r,echo=FALSE}
+datatable(TotalFlowsCMAP.V,container=sketchCMAP,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:18,digits=0) %>% formatStyle(columns=2:18,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:18]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:18])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+
+### Tonmiles
+
+```{r,echo=FALSE}
+datatable(TotalFlowsCMAP.TM,container=sketchCMAP,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:18,currency="",digits=0) %>% formatStyle(columns=2:18,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:18]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:18])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+
+Tables by commodity {data-navmenu="CMAP" data-orientation=rows}
+==================================================
+
+Tonnage Table {data-height=1600 .tabset .tabset-fade}
+-------------------------------------------------
+### Tonnage
+```{r createTablesCMAPCommodity, echo=FALSE}
+
+# Domestic Portion
+DomesticCMAPCommodityFlows <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Move.Type,Mode.Domestic,SCTG)][order(Move.Type,-Tonnage)]
+
+DomesticCMAPCommodityFlowsTotal <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Move.Type="Total",Table="FAF 2012"),by=.(Mode.Domestic,SCTG)][order(Move.Type,-Tonnage)]
+
+DomesticCMAPCommodityFlows <- rbind(DomesticCMAPCommodityFlows,DomesticCMAPCommodityFlowsTotal)
+rm(DomesticCMAPCommodityFlowsTotal)
+
+ModelDomesticCMAPCommodityFlows <- ModelCMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Move.Type,Mode.Domestic,Commodity_SCTG)][order(Move.Type,-Tonnage)]
+
+ModelDomesticCMAPCommodityFlowsTotal <- ModelCMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Move.Type="Total",Table="Model"),by=.(Mode.Domestic,Commodity_SCTG)][order(Move.Type,-Tonnage)]
+
+ModelDomesticCMAPCommodityFlows <- rbind(ModelDomesticCMAPCommodityFlows,ModelDomesticCMAPCommodityFlowsTotal)
+rm(ModelDomesticCMAPCommodityFlowsTotal)
+
+setnames(ModelDomesticCMAPCommodityFlows,old="Commodity_SCTG",new="SCTG")
+DomesticCMAPCommodityFlows <- rbind(DomesticCMAPCommodityFlows,ModelDomesticCMAPCommodityFlows)
+rm(ModelDomesticCMAPCommodityFlows)
+
+DomesticCMAPCommodityFlows.T <- dcast(DomesticCMAPCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Move.Type+Table,value.var = "Tonnage")
+DomesticCMAPCommodityFlows.V <- dcast(DomesticCMAPCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Move.Type+Table,value.var = "Value")
+DomesticCMAPCommodityFlows.TM <- dcast(DomesticCMAPCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Move.Type+Table,value.var = "Tonmiles")
+
+# Domestic Portion of International Trade
+ImpExpDomesticCMAPCommodityFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Domestic,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpDomesticCMAPCommodityFlowsTotal <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012",Move.Type="Total"),by=.(Trade.Type,Mode.Domestic,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpDomesticCMAPCommodityFlows <- rbind(ImpExpDomesticCMAPCommodityFlows,ImpExpDomesticCMAPCommodityFlowsTotal)
+rm(ImpExpDomesticCMAPCommodityFlowsTotal)
+
+ImpExpDomesticCMAPCommodityFlows.T <- dcast(ImpExpDomesticCMAPCommodityFlows[Move.Type=="Total"],SCTG~Mode.Domestic+Table+Trade.Type+Move.Type,value.var = "Tonnage")
+ImpExpDomesticCMAPCommodityFlows.V <- dcast(ImpExpDomesticCMAPCommodityFlows[Move.Type=="Total"],SCTG~Mode.Domestic+Table+Trade.Type+Move.Type,value.var = "Value")
+ImpExpDomesticCMAPCommodityFlows.TM <- dcast(ImpExpDomesticCMAPCommodityFlows[Move.Type=="Total"],SCTG~Mode.Domestic+Table+Trade.Type+Move.Type,value.var = "Tonmiles")
+
+
+
+# Foreign portion of International Trade
+ImpExpInternationalCMAPCommodityFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Foreign,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpInternationalCMAPCommodityFlowsTotal <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012",Move.Type="Total"),by=.(Trade.Type,Mode.Foreign,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpInternationalCMAPCommodityFlows <- rbind(ImpExpInternationalCMAPCommodityFlows,ImpExpInternationalCMAPCommodityFlowsTotal)
+rm(ImpExpInternationalCMAPCommodityFlowsTotal)
+
+ImpExpInternationalCMAPCommodityFlows.T <- dcast(ImpExpInternationalCMAPCommodityFlows[Move.Type=="Total"],SCTG~Mode.Foreign+Table+Trade.Type+Move.Type,value.var = "Tonnage")
+ImpExpInternationalCMAPCommodityFlows.V <- dcast(ImpExpInternationalCMAPCommodityFlows[Move.Type=="Total"],SCTG~Mode.Foreign+Table+Trade.Type+Move.Type,value.var = "Value")
+ImpExpInternationalCMAPCommodityFlows.TM <- dcast(ImpExpInternationalCMAPCommodityFlows[Move.Type=="Total"],SCTG~Mode.Foreign+Table+Trade.Type+Move.Type,value.var = "Tonmiles")
+
+
+
+
+
+
+
+
+countMode <-  DomesticCMAPCommodityFlows[Move.Type!="Total",.N,by=.(Mode.Domestic,Move.Type,Table)]
+sketchDomesticCMAPCommodity <- with(tags,table(
+    thead(
+        tr(
+            th(colspan=1,rowspan=3,"SCTG"),
+            th(colspan= countMode[Mode.Domestic=="Truck",.N],"Truck"),
+            th(colspan= countMode[Mode.Domestic=="Rail",.N],"Rail"),
+            th(colspan= countMode[Mode.Domestic=="Water",.N],"Water"),
+            th(colspan= countMode[Mode.Domestic=="Air",.N],"Air"),
+            th(colspan= countMode[Mode.Domestic=="Multiple",.N],"Multiple"),
+            th(colspan= countMode[Mode.Domestic=="Pipeline",.N],"Pipeline")
+          ),
+        tr(
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="In",.N],"In"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Out",.N],"Out"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within",.N],"Within"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="In",.N],"In"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Out",.N],"Out"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within",.N],"Within"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="In",.N],"In"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Out",.N],"Out"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within",.N],"Within"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="In",.N],"In"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Out",.N],"Out"),
+            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within",.N],"Within"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="In",.N],"In"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Out",.N],"Out"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within",.N],"Within"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="In",.N],"In"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out",.N],"Out"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within",.N],"Within")
+        ),
+        tr(
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="In"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Out"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="In"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Out"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="In"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Out"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="In"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Out"&Table=="Model",.N],"Model"),
+            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="In"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Out"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="In"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012")
+            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within"&Table=="Model",.N],"Model")
+        )
+        )))
+
+datatable(DomesticCMAPCommodityFlows.T,container=sketchDomesticCMAPCommodity,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:ncol(DomesticCMAPCommodityFlows.T),currency="",digits=0) %>% formatStyle(columns=2:ncol(DomesticCMAPCommodityFlows.T),backgroundColor=styleInterval(sort(unlist(DomesticCMAPCommodityFlows.T[,2:ncol(DomesticCMAPCommodityFlows.T)]))[-1],createCSSColors(sort(unlist(DomesticCMAPCommodityFlows.T[,2:ncol(DomesticCMAPCommodityFlows.T)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+
+```
+
+
+### Value
+
+```{r,echo=FALSE}
+datatable(DomesticCMAPCommodityFlows.V,container=sketchDomesticCMAPCommodity,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:ncol(DomesticCMAPCommodityFlows.V),digits=0) %>% formatStyle(columns=2:ncol(DomesticCMAPCommodityFlows.V),backgroundColor=styleInterval(sort(unlist(DomesticCMAPCommodityFlows.V[,2:ncol(DomesticCMAPCommodityFlows.V)]))[-1],createCSSColors(sort(unlist(DomesticCMAPCommodityFlows.V[,2:ncol(DomesticCMAPCommodityFlows.V)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+### Ton-miles
+
+```{r,echo=FALSE}
+datatable(DomesticCMAPCommodityFlows.TM,container=sketchDomesticCMAPCommodity,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:ncol(DomesticCMAPCommodityFlows.TM),currency="",digits=0) %>% formatStyle(columns=2:ncol(DomesticCMAPCommodityFlows.TM),backgroundColor=styleInterval(sort(unlist(DomesticCMAPCommodityFlows.TM[,2:ncol(DomesticCMAPCommodityFlows.TM)]))[-1],createCSSColors(sort(unlist(DomesticCMAPCommodityFlows.TM[,2:ncol(DomesticCMAPCommodityFlows.TM)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+
+
+
+
+
+Total Flow Chart {data-navmenu="CMAP" data-width=600}
+============================================
+
+<!-- Flows {} -->
+<!-- ------------------- -->
+
+<!-- ### Domestic Flows -->
+
+<!-- ```{r plotDomesticFlow, echo=FALSE,results="hide",eval=FALSE} -->
+
+<!-- # Observed Data -->
+<!-- DomesticStateCMAPFlows <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000),by=.(Origin.Domestic,Origin.State,Destination.Domestic,Destination.State,Mode.Domestic,Move.Type)][,.(Origin.Domestic,Origin.State,Destination.Domestic,Destination.State,Tonnage,Mode.Domestic,Move.Type,Colors = modeColors[.(Mode.Domestic),colors])] -->
+
+<!-- DomesticStateCMAPFlows[,c("DestinationRegion","DestinationSubReion"):=(stateRegion[as.character(DomesticStateCMAPFlows[,Destination.State]),.(Region,SubRegion)])] -->
+
+<!-- DomesticStateCMAPFlows[,c("OriginRegion","OriginSubRegion"):=(stateRegion[as.character(DomesticStateCMAPFlows[,Origin.State]),.(Region,SubRegion)])] -->
+
+<!-- circos.clear() -->
+<!-- circos.par(start.degree=0,gap.degree=10,cell.padding=c(0,0,0,0),points.overflow.warning=FALSE) -->
+
+<!-- chordDiagram(DomesticStateCMAPFlows[,.(Origin=ifelse(Origin.Domestic %in% CMAPFAFCodes,as.character(Origin.State),OriginRegion),Destination=ifelse(Destination.Domestic %in% CMAPFAFCodes,as.character(Destination.State),DestinationRegion),Tonnage)],transparency = 0.25,col = DomesticStateCMAPFlows[,Colors],grid.col = "white",grid.border = "white",directional = 1,direction.type = c("arrows","diffHeight"),diffHeight = -0.05,annotationTrack = "grid",annotationTrackHeight = c(0.05,0.05),link.arr.type = "big.arrow",link.sort = TRUE,link.largest.ontop = TRUE) -->
+
+<!-- circos.trackPlotRegion( -->
+<!--   track.index = 1, -->
+<!--   bg.border = NA, -->
+<!--   panel.fun = function(x,y){ -->
+<!--     sector.index = get.cell.meta.data("sector.index") -->
+<!--     xlim = get.cell.meta.data("xlim") -->
+<!--     circos.text(x=mean(xlim),y=1,labels=sector.index,facing = "bending.inside", pos=4,cex=1,offset=0,col="black") -->
+<!--   } -->
+<!-- ) -->
+
+<!-- ``` -->
+
+<!-- ### Model Domestic Flows -->
+
+<!-- ```{r plotModelDomesticFlow, echo=FALSE,results="hide"} -->
+
+<!-- # Observed Data -->
+<!-- ModelDomesticStateCMAPFlows <- ModelDomesticCMAPFlows[,.(Tonnage=sum(Tons)/1000),by=.(Origin.Domestic,Origin.State,Destination.Domestic,Destination.State,Move.Type)][,.(Origin.Domestic,Origin.State,Destination.Domestic,Destination.State,Tonnage,Move.Type)] -->
+
+<!-- ModelDomesticStateCMAPFlows[,c("DestinationRegion","DestinationSubReion"):=(stateRegion[as.character(ModelDomesticStateCMAPFlows[,Destination.State]),.(Region,SubRegion)])] -->
+
+<!-- ModelDomesticStateCMAPFlows[,c("OriginRegion","OriginSubRegion"):=(stateRegion[as.character(ModelDomesticStateCMAPFlows[,Origin.State]),.(Region,SubRegion)])] -->
+
+<!-- circos.clear() -->
+<!-- circos.par(start.degree=0,gap.degree=10,cell.padding=c(0,0,0,0),points.overflow.warning=FALSE) -->
+
+<!-- chordDiagram(ModelDomesticStateCMAPFlows[,.(Origin=ifelse(Origin.Domestic %in% CMAPFAFCodes,as.character(Origin.State),OriginRegion),Destination=ifelse(Destination.Domestic %in% CMAPFAFCodes,as.character(Destination.State),DestinationRegion),Tonnage)],transparency = 0.25,grid.col = "white",grid.border = "white",directional = 1,direction.type = c("arrows","diffHeight"),diffHeight = -0.05,annotationTrack = "grid",annotationTrackHeight = c(0.05,0.05),link.arr.type = "big.arrow",link.sort = TRUE,link.largest.ontop = TRUE) -->
+
+<!-- circos.trackPlotRegion( -->
+<!--   track.index = 1, -->
+<!--   bg.border = NA, -->
+<!--   panel.fun = function(x,y){ -->
+<!--     sector.index = get.cell.meta.data("sector.index") -->
+<!--     xlim = get.cell.meta.data("xlim") -->
+<!--     circos.text(x=mean(xlim),y=1,labels=sector.index,facing = "bending.inside", pos=4,cex=1,offset=0,col="black") -->
+<!--   } -->
+<!-- ) -->
+
+<!-- ``` -->
+
+Domestic Bar Charts
+-----------------------------------
+
+### Domestic Flows Tonnage
+
+```{r comparisonPlotDomesticTonnage, echo=FALSE}
+
+p <- DomesticCMAPFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonnage,fill=Table))+geom_bar(stat = "identity",position = "dodge")+labs(x="Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+scale_fill_manual("",values=dataColor)
+
+ggplotly(p)
+```
+
+
+### Domestic Flows Value
+
+```{r comparisonPlotDomesticValue, echo=FALSE}
+
+p <- DomesticCMAPFlows %>% ggplot(aes(x=Mode.Domestic,y=Value,fill=Table))+geom_bar(stat = "identity",position = "dodge")+labs(x="Mode",y="Value")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+scale_fill_manual("",values=dataColor)
+
+ggplotly(p)
+```
+
+### Domestic Flows Ton-miles
+
+```{r comparisonPlotDomesticTonmiles, echo=FALSE}
+
+p <- DomesticCMAPFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonmiles,fill=Table))+geom_bar(stat = "identity",position = "dodge")+labs(x="Mode",y="Ton-miles")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+scale_fill_manual("",values=dataColor)
+
+ggplotly(p)
+```
+
+National Bar Charts
+-----------------------------------
+
+### International Flows Tonnage
+
+```{r comparisonPlotInternationalDomesticTonnage, echo=FALSE}
+ImpExpDomesticCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0)),by=.(Move.Type,Mode.Domestic,Mode.Foreign)][order(Move.Type,-Tonnage)]
+
+p <- ImpExpDomesticCMAPFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonnage,fill=Mode.Foreign))+geom_bar(stat = "identity")+labs(x="Domestic Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+guides(fill=guide_legend("Foreign Mode"))+scale_fill_manual(values = modeColors2)+scale_y_continuous(position = "right")
+
+ggplotly(p)
+```
+
+### International Flows Value
+
+```{r comparisonPlotInternationalDomesticValue, echo=FALSE}
+
+p <- ImpExpDomesticCMAPFlows %>% ggplot(aes(x=Mode.Domestic,y=Value,fill=Mode.Foreign))+geom_bar(stat = "identity")+labs(x="Domestic Mode",y="Value")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+guides(fill=guide_legend("Foreign Mode"))+scale_fill_manual(values = modeColors2)+scale_y_continuous(position = "right")
+
+ggplotly(p)
+```
+
+### International Flows Ton-miles
+
+```{r comparisonPlotInternationalDomesticTonmiles, echo=FALSE}
+
+p <- ImpExpDomesticCMAPFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonmiles,fill=Mode.Foreign))+geom_bar(stat = "identity")+labs(x="Domestic Mode",y="Ton-miles")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+guides(fill=guide_legend("Foreign Mode"))+scale_fill_manual(values = modeColors2)+scale_y_continuous(position = "right")
+
+ggplotly(p)
+```
+
+
+
+<!-- ### International Flows Domestic Mode -->
+
+<!-- ```{r comparisonPlotInternationalDomestic, echo=FALSE} -->
+<!-- ImpExpDomesticCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0)),by=.(Move.Type,Mode.Domestic)][order(Move.Type,-Tonnage)] -->
+
+<!-- p <- ImpExpDomesticCMAPFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonnage))+geom_bar(stat = "identity")+labs(x="Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right") -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### International Flows Foreign Mode -->
+
+<!-- ```{r comparisonPlotInternationalForeign, echo=FALSE} -->
+<!-- ImpExpInternationalCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0)),by=.(Move.Type,Mode.Foreign)][order(Move.Type,-Tonnage)] -->
+
+<!-- p <- ImpExpInternationalCMAPFlows %>% ggplot(aes(x=reorder(Mode.Foreign,Tonnage,function(x) -mean(x)),y=Tonnage))+geom_bar(stat = "identity")+labs(x="Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right") -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+
+
+
+Commodity Flow Charts {data-navmenu="CMAP" .tabset .tabset-fade}
+===================================================================
+
+Domestic Commodity Flow Tonnage {.tabset .tabset-fade}
+----------------------------------------------------------------
+
+### Tonnage In
+```{r,echo=FALSE, include=FALSE}
+# DomesticCMAPCommodityFlows <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0)),by=.(SCTG,Mode.Domestic,Move.Type)][order(SCTG,Move.Type,Mode.Domestic)]
+
+latestSCTGCodes <- SCTGCodes[Version==getLatestFAFVersion()]
+latestSCTGCodes[,Version:=NULL]
+setkey(latestSCTGCodes,SCTG)
+
+DomesticCMAPCommodityFlows <- merge(DomesticCMAPCommodityFlows,latestSCTGCodes,by="SCTG",all.x=TRUE,all.y=FALSE)
+DomesticCMAPCommodityFlows[,SCTGLabels:=paste(SCTG,Label)]
+
+```
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="In"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Tonnage,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+### Value In
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="In"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Value,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Value",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+
+### Ton-miles In
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="In"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Tonmiles,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Ton-miles",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+Domestic Commodity Flow Value {.tabset .tabset-fade}
+----------------------------------------------------------------
+
+### Tonnage Out
+
+```{r,echo=FALSE,fig.height=9}
+
+p <- DomesticCMAPCommodityFlows[Move.Type=="Out"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Tonnage,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+### Value Out
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="Out"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Value,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Value",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+
+### Ton-miles Out
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="Out"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Tonmiles,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Ton-miles",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+Domestic Commodity Flow Tonmiles {.tabset .tabset-fade}
+----------------------------------------------------------------
+
+### Tonnage Within
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="Within"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Value,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+### Value Within
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="Within"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Value,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Value",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+
+### Ton-miles Within
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCMAPCommodityFlows[Move.Type=="Within"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x))))+geom_bar(aes(y=Tonmiles,fill=Table),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Ton-miles",x="Commodity")+guides(fill=guide_legend("Table"))+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+ggplotly(p)
+```
+
+
+
+<!-- International Commodity Flow {.tabset .tabset-fade} -->
+<!-- ----------------------------------------------------- -->
+
+<!-- ### Domestic Mode (Total) -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCMAPCommodityFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits = 0)),by=.(SCTG,Mode.Domestic,Move.Type)][order(SCTG,Move.Type,Mode.Domestic)] -->
+
+
+<!-- ImpExpDomesticCMAPCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCMAPCommodityFlows %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Domestic))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(8)) + scale_y_log10(limits=c(0.5,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Domestic Mode (Import) -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCMAPCommodityFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits = 0)),by=.(Trade.Type,SCTG,Mode.Domestic,Move.Type)][order(Trade.Type,SCTG,Move.Type,Mode.Domestic)] -->
+
+
+<!-- ImpExpDomesticCMAPCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCMAPCommodityFlows[Trade.Type=="Import"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Domestic))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(8)) + scale_y_log10(limits=c(0.5,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Domestic Mode (Export) -->
+
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCMAPCommodityFlows[Trade.Type=="Export"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Domestic))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(7)) + scale_y_log10(limits=c(0.5,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Foreign Mode (Total) -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCMAPCommodityFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits = 0)),by=.(SCTG,Mode.Foreign,Move.Type)][order(SCTG,Move.Type,Mode.Foreign)] -->
+
+
+<!-- ImpExpDomesticCMAPCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCMAPCommodityFlows %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Foreign))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(8)) + scale_y_log10(limits=c(0.5,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Foreign Mode (Import) -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCMAPCommodityFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits = 0)),by=.(Trade.Type,SCTG,Mode.Foreign,Move.Type)][order(Trade.Type,SCTG,Move.Type,Mode.Foreign)] -->
+
+
+<!-- ImpExpDomesticCMAPCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCMAPCommodityFlows[Trade.Type=="Import"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Foreign))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(8)) + scale_y_log10(limits=c(0.5,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Foreign Mode (Export) -->
+
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCMAPCommodityFlows[Trade.Type=="Export"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Foreign))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(7)) + scale_y_log10(limits=c(0.5,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+
+
+
+
+
+Regional Flow Chart {data-navmenu="CMAP"}
+================================================
+
+Flows {data-height=550 .tabset .tabset-fade}
+----------------------------
+
+### Tonnage
+```{r,echo=FALSE,fig.height=9}
+DomesticCMAPRegionFlows <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Origin.Region,Destination.Region,Mode.Domestic)]
+
+ModelDomesticCMAPRegionFlows <- ModelCMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Origin.Region,Destination.Region,Mode.Domestic)]
+
+DomesticCMAPRegionFlows <- rbind(DomesticCMAPRegionFlows,ModelDomesticCMAPRegionFlows)
+rm(ModelDomesticCMAPRegionFlows)
+
+p <- DomesticCMAPRegionFlows[!is.na(Origin.Region)&!is.na(Destination.Region)] %>% ggplot(aes(x=Mode.Domestic,y=Tonnage))+geom_bar(aes(fill=Table),stat="identity",position="dodge")+facet_wrap(~Origin.Region+Destination.Region,nrow = 2,scales = "free_y")+theme_db+scale_fill_manual(values=makeMoreColors(2))+labs(x="Domestic Mode",y="Tonnage")
+
+ggplotly(p)
+```
+
+
+### Value
+```{r,echo=FALSE,fig.height=9}
+
+p <- DomesticCMAPRegionFlows[!is.na(Origin.Region)&!is.na(Destination.Region)] %>% ggplot(aes(x=Mode.Domestic,y=Value))+geom_bar(aes(fill=Table),stat="identity",position="dodge")+facet_grid(Origin.Region~Destination.Region,scales = "free_y")+theme_db+scale_fill_manual(values=makeMoreColors(2))+labs(x="Domestic Mode",y="Value")
+
+ggplotly(p)
+```
+
+### Ton-miles
+```{r,echo=FALSE,fig.height=9}
+
+p <- DomesticCMAPRegionFlows[!is.na(Origin.Region)&!is.na(Destination.Region)] %>% ggplot(aes(x=Mode.Domestic,y=Tonmiles))+geom_bar(aes(fill=Table),stat="identity",position="dodge")+facet_grid(Origin.Region~Destination.Region,scales = "free_y")+theme_db+scale_fill_manual(values=makeMoreColors(2))+labs(x="Domestic Mode",y="Ton-miles")
+
+ggplotly(p)
+```
+
+
+Tables {data-navmenu="National"}
+==================================================
+### Summary Tables
+```{r createTablesNational, echo=FALSE}
+DomesticFlows <- Flows[Trade.Type=="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0),Table="FAF 2012"),by=.(Move.Type,Mode.Domestic)][order(Move.Type,-Tonnage)]
+
+ModelDomesticFlows <- ModelFlows[Trade.Type=="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0),Table="Model"),by=.(Move.Type,Mode.Domestic)][order(Move.Type,-Tonnage)]
+
+DomesticFlows <- rbind(DomesticFlows,ModelDomesticFlows)
+rm(ModelDomesticFlows)
+
+
+DomesticFlows.T <- dcast(DomesticFlows,Mode.Domestic~Move.Type+Table,value.var = "Tonnage")
+DomesticFlows.V <- dcast(DomesticFlows,Mode.Domestic~Move.Type+Table,value.var = "Value")
+DomesticFlows.TM <- dcast(DomesticFlows,Mode.Domestic~Move.Type+Table,value.var = "Tonmiles")
+
+ImpExpDomesticFlows <-Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0),Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Domestic)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpDomesticFlows.T <- dcast(ImpExpDomesticFlows,Mode.Domestic~Trade.Type+Move.Type+Table,value.var="Tonnage")
+ImpExpDomesticFlows.V <- dcast(ImpExpDomesticFlows,Mode.Domestic~Trade.Type+Move.Type+Table,value.var="Value")
+ImpExpDomesticFlows.TM <- dcast(ImpExpDomesticFlows,Mode.Domestic~Trade.Type+Move.Type+Table,value.var="Tonmiles")
+
+ImpExpInternationalFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0),Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Foreign)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpInternationalFlows.T <- dcast(ImpExpInternationalFlows,Mode.Foreign~Trade.Type+Move.Type+Table,value.var="Tonnage")
+ImpExpInternationalFlows.V <- dcast(ImpExpInternationalFlows,Mode.Foreign~Trade.Type+Move.Type+Table,value.var="Value")
+ImpExpInternationalFlows.TM <- dcast(ImpExpInternationalFlows,Mode.Foreign~Trade.Type+Move.Type+Table,value.var="Tonmiles")
+
+TotalFlowsNational.T <- merge(merge(DomesticFlows.T,ImpExpDomesticFlows.T,by="Mode.Domestic"),ImpExpInternationalFlows.T,by.x="Mode.Domestic",by.y="Mode.Foreign")
+TotalFlowsNational.V <- merge(merge(DomesticFlows.V,ImpExpDomesticFlows.V,by="Mode.Domestic"),ImpExpInternationalFlows.V,by.x="Mode.Domestic",by.y="Mode.Foreign")
+TotalFlowsNational.TM <- merge(merge(DomesticFlows.TM,ImpExpDomesticFlows.TM,by="Mode.Domestic"),ImpExpInternationalFlows.TM,by.x="Mode.Domestic",by.y="Mode.Foreign")
+
+
+sketchNational <- with(tags,table(
+    thead(
+        tr(
+            th(colspan=1,rowspan=4,"Mode"),
+            th(colspan=4,rowspan=2, "Domesitc"),
+            th(colspan=4, "Domestic"),
+            th(colspan=4, "International")
+          ),
+        tr(
+            th(colspan=2, "Import"),
+            th(colspan=2, "Export"),
+            th(colspan=2, "Import"),
+            th(colspan=2, "Export")
+        ),
+        tr(
+            lapply(c("Within Zones","Between Zones"),th,colspan=2),
+            lapply(rep(c("Within Zones","Between Zones"),4),th)
+        ),
+        tr(
+            lapply(rep(c("FAF 2012","Model"),2),th),
+            lapply(rep("FAF 2012",8),th)
+        )
+        )))
+
+# formattedTable <- formattable(TotalFlowsNational,list(
+#   Mode.Domestic=formatter("span",style=~style(font.weight="bold")),
+#   area(col = c(In,Out,Within))~color_tile("white",rsgcolordf[1,5]),
+#   area(col = c(Import_In.x,Import_Out.x,Import_Within.x))~color_tile("white",rsgcolordf[1,5]),
+#   area(col = c(Export_In.x,Export_Out.x,Export_Within.x))~color_tile("white",rsgcolordf[1,5]),
+#   area(col = c(Import_In.y,Import_Out.y,Import_Within.y))~color_tile("white",rsgcolordf[1,5]),
+#   area(col = c(Export_In.y,Export_Out.y,Export_Within.y))~color_tile("white",rsgcolordf[1,5])
+# ))
+
+# as.datatable(formattedTable,container=sketchCMAP,rownames=FALSE,
+#              options = list(sDom  = '<"top">lrt<"bottom">ip',
+#                             autowidth = TRUE,
+#                             bPaginate = FALSE,
+#                             bFilter = FALSE,
+#                             columnDefs = list(list(width = '10%'))),
+#              caption = "CMAP Flow (Tonnage)")%>% formatRound(2:16,0)
+
+datatable(TotalFlowsNational.T,container=sketchNational,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:13,currency="",digits=0) %>% formatStyle(columns=2:13,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,2:13]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,2:13])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+
+
+
+```
+
+
+### Value
+
+```{r,echo=FALSE}
+datatable(TotalFlowsNational.V,container=sketchNational,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:13,digits=0) %>% formatStyle(columns=2:13,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,2:13]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,2:13])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+
+### Tonmiles
+
+```{r,echo=FALSE}
+datatable(TotalFlowsNational.TM,container=sketchNational,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:13,currency="",digits=0) %>% formatStyle(columns=2:13,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,2:13]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,2:13])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+
+
+
+
+
+Tables by Commodity {data-navmenu="National" data-orientation=rows}
+===============================================
+
+Tonnage Table {data-height=1600 .tabset .tabset-fade}
+-------------------------------------------------
+### Tonnage
+```{r createTablesCommodity, echo=FALSE}
+
+# Domestic Portion
+DomesticCommodityFlows <- Flows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Move.Type,Mode.Domestic,SCTG)][order(Move.Type,-Tonnage)]
+
+DomesticCommodityFlowsTotal <- Flows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Move.Type="Total",Table="FAF 2012"),by=.(Mode.Domestic,SCTG)][order(Move.Type,-Tonnage)]
+
+DomesticCommodityFlows <- rbind(DomesticCommodityFlows,DomesticCommodityFlowsTotal)
+rm(DomesticCommodityFlowsTotal)
+
+ModelDomesticCommodityFlows <- ModelFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Move.Type,Mode.Domestic,Commodity_SCTG)][order(Move.Type,-Tonnage)]
+
+ModelDomesticCommodityFlowsTotal <- ModelFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Move.Type="Total",Table="Model"),by=.(Mode.Domestic,Commodity_SCTG)][order(Move.Type,-Tonnage)]
+
+ModelDomesticCommodityFlows <- rbind(ModelDomesticCommodityFlows,ModelDomesticCommodityFlowsTotal)
+rm(ModelDomesticCommodityFlowsTotal)
+
+setnames(ModelDomesticCommodityFlows,old="Commodity_SCTG",new="SCTG")
+DomesticCommodityFlows <- rbind(DomesticCommodityFlows,ModelDomesticCommodityFlows)
+rm(ModelDomesticCommodityFlows)
+
+DomesticCommodityFlows <- DomesticCommodityFlows[,Move.Type:=relevel(factor(Move.Type),ref="Within Zones")] # To reorder dcast output
+
+DomesticCommodityFlows.T <- dcast(DomesticCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Move.Type+Table,value.var = "Tonnage")
+DomesticCommodityFlows.V <- dcast(DomesticCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Move.Type+Table,value.var = "Value")
+DomesticCommodityFlows.TM <- dcast(DomesticCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Move.Type+Table,value.var = "Tonmiles")
+
+# Domestic Portion of International Trade
+ImpExpDomesticCommodityFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Domestic,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpDomesticCommodityFlowsTotal <- Flows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012",Move.Type="Total"),by=.(Trade.Type,Mode.Domestic,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpDomesticCommodityFlows <- rbind(ImpExpDomesticCommodityFlows,ImpExpDomesticCommodityFlowsTotal)
+rm(ImpExpDomesticCommodityFlowsTotal)
+
+ImpExpDomesticCommodityFlows <- ImpExpDomesticCommodityFlows[,Move.Type:=relevel(factor(Move.Type),ref="Within Zones")] # To reorder dcast output
+
+ImpExpDomesticCommodityFlows.T <- dcast(ImpExpDomesticCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Trade.Type+Move.Type+Table,value.var = "Tonnage")
+ImpExpDomesticCommodityFlows.V <- dcast(ImpExpDomesticCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Trade.Type+Move.Type+Table,value.var = "Value")
+ImpExpDomesticCommodityFlows.TM <- dcast(ImpExpDomesticCommodityFlows[Move.Type!="Total"],SCTG~Mode.Domestic+Trade.Type+Move.Type+Table,value.var = "Tonmiles")
+
+
+
+# Foreign portion of International Trade
+ImpExpInternationalCommodityFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Foreign,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpInternationalCommodityFlowsTotal <- Flows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012",Move.Type="Total"),by=.(Trade.Type,Mode.Foreign,SCTG)][order(Trade.Type,Move.Type,-Tonnage)]
+
+ImpExpInternationalCommodityFlows <- rbind(ImpExpInternationalCommodityFlows,ImpExpInternationalCommodityFlowsTotal)
+rm(ImpExpInternationalCommodityFlowsTotal)
+
+ImpExpInternationalCommodityFlows <- ImpExpInternationalCommodityFlows[,Move.Type:=relevel(factor(Move.Type),ref="Within Zones")] # To reorder dcast output
+
+ImpExpInternationalCommodityFlows.T <- dcast(ImpExpInternationalCommodityFlows[Move.Type!="Total"],SCTG~Mode.Foreign+Trade.Type+Move.Type+Table,value.var = "Tonnage")
+ImpExpInternationalCommodityFlows.V <- dcast(ImpExpInternationalCommodityFlows[Move.Type!="Total"],SCTG~Mode.Foreign+Trade.Type+Move.Type+Table,value.var = "Value")
+ImpExpInternationalCommodityFlows.TM <- dcast(ImpExpInternationalCommodityFlows[Move.Type!="Total"],SCTG~Mode.Foreign+Trade.Type+Move.Type+Table,value.var = "Tonmiles")
+
+
+countMode <-  DomesticCommodityFlows[Move.Type!="Total",.N,by=.(Mode.Domestic,Move.Type,Table)]
+sketchDomesticCommodity <- with(tags,table(
+    thead(
+        tr(
+            th(colspan=1,rowspan=3,"SCTG"),
+            th(colspan= countMode[Mode.Domestic=="Truck",.N],"Truck"),
+            th(colspan= countMode[Mode.Domestic=="Rail",.N],"Rail"),
+            th(colspan= countMode[Mode.Domestic=="Water",.N],"Water"),
+            th(colspan= countMode[Mode.Domestic=="Air",.N],"Air"),
+            th(colspan= countMode[Mode.Domestic=="Multiple",.N],"Multiple"),
+            th(colspan= countMode[Mode.Domestic=="Pipeline",.N],"Pipeline"),
+            th(colspan= countMode[Mode.Domestic=="Other",.N],"Other")
+            # th(colspan= countMode[Mode.Domestic=="None",.N],"None")
+          ),
+        tr(
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones",.N],"Within Zones"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones",.N],"Between Zones"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones",.N],"Within Zones"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones",.N],"Between Zones"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones",.N],"Within Zones"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones",.N],"Between Zones"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones",.N],"Within Zones"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones",.N],"Between Zones"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones",.N],"Within Zones"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones",.N],"Between Zones"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones",.N],"Within Zones"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones",.N],"Between Zones"),
+            th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones",.N],"Within Zones")
+            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones",.N],"Between Zones"),
+            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Within Zones",.N],"Within Zones"),
+            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Between Zones",.N],"Between Zones")
+        ),
+        tr(
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
+            th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012")
+            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
+            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
+            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
+            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Between Zones"&Table=="Model",.N],"Model")
+        )
+        )))
+
+datatable(DomesticCommodityFlows.T,container=sketchDomesticCommodity,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:ncol(DomesticCommodityFlows.T),currency="",digits=0) %>% formatStyle(columns=2:ncol(DomesticCommodityFlows.T),backgroundColor=styleInterval(sort(unlist(DomesticCommodityFlows.T[,2:ncol(DomesticCommodityFlows.T)]))[-1],createCSSColors(sort(unlist(DomesticCommodityFlows.T[,2:ncol(DomesticCommodityFlows.T)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+
+```
+
+
+### Value
+
+```{r, echo=FALSE}
+datatable(DomesticCommodityFlows.V,container=sketchDomesticCommodity,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:ncol(DomesticCommodityFlows.V),digits=0) %>% formatStyle(columns=2:ncol(DomesticCommodityFlows.V),backgroundColor=styleInterval(sort(unlist(DomesticCommodityFlows.V[,2:ncol(DomesticCommodityFlows.V)]))[-1],createCSSColors(sort(unlist(DomesticCommodityFlows.V[,2:ncol(DomesticCommodityFlows.V)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+### Ton-miles
+
+```{r,echo=FALSE}
+datatable(DomesticCommodityFlows.TM,container=sketchDomesticCommodity,rownames=FALSE,extensions = 'FixedColumns',
+             options = list(sDom  = '<"top">lrt<"bottom">ip',
+                            fixedColumns = TRUE,
+                            autowidth = TRUE,
+                            bPaginate = FALSE,
+                            bFilter = FALSE,
+                            bInfo = FALSE,
+                            columnDefs = list(list(width = '20%')),
+                            searching=FALSE,
+                            paging=FALSE)) %>% formatCurrency(2:ncol(DomesticCommodityFlows.TM),currency="",digits=0) %>% formatStyle(columns=2:ncol(DomesticCommodityFlows.TM),backgroundColor=styleInterval(sort(unlist(DomesticCommodityFlows.TM[,2:ncol(DomesticCommodityFlows.TM)]))[-1],createCSSColors(sort(unlist(DomesticCommodityFlows.TM[,2:ncol(DomesticCommodityFlows.TM)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+```
+
+
+
+
+Total Flow Chart {data-navmenu="National"}
+==================================
+
+<!-- Flows -->
+<!-- ----------------- -->
+
+<!-- ### Domestic Flows -->
+
+<!-- ```{r plotDomesticNationalFlow, echo=FALSE,results="hide"} -->
+
+<!-- DomesticStateFlows <- Flows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000),by=.(Origin.Domestic,Origin.State,Destination.Domestic,Destination.State,Mode.Domestic,Move.Type)][,.(Origin.Domestic,Origin.State,Destination.Domestic,Destination.State,Tonnage,Mode.Domestic,Move.Type,Colors = modeColors[as.character(Mode.Domestic),colors])] -->
+
+<!-- DomesticStateFlows[,c("DestinationRegion","DestinationSubReion"):=(stateRegion[as.character(DomesticStateFlows[,Destination.State]),.(Region,SubRegion)])] -->
+
+<!-- DomesticStateFlows[,c("OriginRegion","OriginSubRegion"):=(stateRegion[as.character(DomesticStateFlows[,Origin.State]),.(Region,SubRegion)])] -->
+
+
+
+<!-- circos.clear() -->
+<!-- circos.par(start.degree=0,gap.degree=5,cell.padding=c(0,0,0,0),points.overflow.warning=FALSE) -->
+
+<!-- chordDiagram(DomesticStateFlows[,.(Tonnage=sum(Tonnage)),by=.(OriginRegion,DestinationRegion,Mode.Domestic,Colors)][,.(OriginRegion,DestinationRegion,Tonnage)],transparency = 0.25,col = DomesticStateFlows[,.(Tonnage=sum(Tonnage)),by=.(OriginRegion,DestinationRegion,Mode.Domestic,Colors)][,Colors],grid.col = "darkgrey",grid.border = "black",directional = 1,direction.type = c("arrows","diffHeight"),diffHeight = -0.05,annotationTrack = "grid",annotationTrackHeight = c(0.1,0.1),link.arr.type = "big.arrow",link.sort = TRUE,link.largest.ontop = TRUE) -->
+
+<!-- circos.trackPlotRegion( -->
+<!--   track.index = 1, -->
+<!--   bg.border = NA, -->
+<!--   panel.fun = function(x,y){ -->
+<!--     sector.index = get.cell.meta.data("sector.index") -->
+<!--     xlim = get.cell.meta.data("xlim") -->
+<!--     circos.text(x=mean(xlim),y=1,labels=sector.index,facing = "bending.inside", pos=4,cex=1,offset=0,col="white") -->
+<!--   } -->
+<!-- ) -->
+
+<!-- ``` -->
+
+
+Domestic Flows
+------------------------
+
+### Domestic Flows Tonnage
+
+```{r comparisonPlotNationalTonnage, echo=FALSE}
+# DomestiFlows <- Flows[Trade.Type=="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0)),by=.(Move.Type,Mode.Domestic)][order(Move.Type,-Tonnage)]
+
+p <- DomesticFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonnage,fill=Table))+geom_bar(stat = "identity")+labs(x="Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+scale_fill_manual(values=makeMoreColors(2))
+
+ggplotly(p)
+```
+
+### Domestic Flows Value
+
+```{r comparisonPlotNationalValue, echo=FALSE}
+
+p <- DomesticFlows %>% ggplot(aes(x=Mode.Domestic,y=Value,fill=Table))+geom_bar(stat = "identity")+labs(x="Mode",y="Value")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+scale_fill_manual(values=makeMoreColors(2))
+
+ggplotly(p)
+```
+
+### Domestic Flows Ton-miles
+
+```{r comparisonPlotNationalTonmiles, echo=FALSE}
+
+p <- DomesticFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonmiles,fill=Table))+geom_bar(stat = "identity")+labs(x="Mode",y="Ton-miles")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+scale_fill_manual(values=makeMoreColors(2))
+
+ggplotly(p)
+```
+
+International Flows
+--------------------------
+### International Flows Tonnage
+
+```{r comparisonPlotNationalDomesticTonnage, echo=FALSE}
+ImpExpDomesticFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0)),by=.(Move.Type,Mode.Domestic,Mode.Foreign)][order(Move.Type,-Tonnage)]
+
+p <- ImpExpDomesticFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonnage,fill=Mode.Foreign))+geom_bar(stat = "sum")+labs(x="Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+guides(fill=guide_legend("Foreign Mode"))+scale_fill_manual(values=modeColors2)
+
+ggplotly(p)
+```
+
+### International Flows Value
+
+```{r comparisonPlotNationalDomesticValue, echo=FALSE}
+
+p <- ImpExpDomesticFlows %>% ggplot(aes(x=Mode.Domestic,y=Value,fill=Mode.Foreign))+geom_bar(stat = "sum")+labs(x="Mode",y="Value")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+guides(fill=guide_legend("Foreign Mode"))+scale_fill_manual(values=modeColors2)
+
+ggplotly(p)
+```
+
+### International Flows Ton-miles
+
+```{r comparisonPlotNationalDomesticTonmiles, echo=FALSE}
+
+p <- ImpExpDomesticFlows %>% ggplot(aes(x=Mode.Domestic,y=Tonmiles,fill=Mode.Foreign))+geom_bar(stat = "sum")+labs(x="Mode",y="Ton-miles")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right")+guides(fill=guide_legend("Foreign Mode"))+scale_fill_manual(values=modeColors2)
+
+ggplotly(p)
+```
+
+
+
+
+<!-- ### International Flows Domestic Mode -->
+
+<!-- ```{r comparisonPlotNationalDomestic, echo=FALSE} -->
+<!-- ImpExpDomesticFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0)),by=.(Move.Type,Mode.Domestic)][order(Move.Type,-Tonnage)] -->
+
+<!-- p <- ImpExpDomesticFlows %>% ggplot(aes(x=reorder(Mode.Domestic,Tonnage,function(x) -mean(x)),y=Tonnage))+geom_bar(stat = "identity")+labs(x="Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right") -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### International Flows Foreign Mode -->
+
+<!-- ```{r comparisonPlotNationalInternational, echo=FALSE} -->
+<!-- ImpExpInternationalFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0)),by=.(Move.Type,Mode.Foreign)][order(Move.Type,-Tonnage)] -->
+
+<!-- p <- ImpExpInternationalFlows %>% ggplot(aes(x=reorder(Mode.Foreign,Tonnage,function(x) -mean(x)),y=Tonnage))+geom_bar(stat = "identity")+labs(x="Mode",y="Tonnage")+facet_grid(Move.Type~.,scales = "free_y",switch = "y")+theme_db+scale_y_continuous(position = "right") -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+Commodity Flow Charts {data-navmenu="National"}
+================================================
+
+Domestic Commodity Flow Tonnage {.tabset .tabset-fade}
+-------------------------------------------------------------
+
+### Commodity Flows Within Zones
+```{r,echo=FALSE, include=FALSE}
+# DomesticCommodityFlows <- Flows[Trade.Type=="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0)),by=.(SCTG,Mode.Domestic,Move.Type)][order(SCTG,Move.Type,Mode.Domestic)]
+
+DomesticCommodityFlows <- merge(DomesticCommodityFlows,latestSCTGCodes,by="SCTG",all.x=TRUE,all.y=FALSE)
+DomesticCommodityFlows[,SCTGLabels:=paste(SCTG,Label)]
+
+```
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCommodityFlows[Move.Type=="Within Zones"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Table))+geom_bar(aes(y=Tonnage),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Tonnage",x="Commodity")+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+
+
+ggplotly(p)
+```
+
+### Commodity Flows Between Zones
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCommodityFlows[Move.Type=="Between Zones"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Table))+geom_bar(aes(y=Tonnage),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Tonnage",x="Commodity")+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+
+
+ggplotly(p)
+```
+
+<!-- ### Commodity Flows Total -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- DomesticCommodityFlows[Move.Type=="Total"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Table))+geom_bar(aes(y=Tonnage),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Tonnage",x="Commodity")+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90)) -->
+
+
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+
+Domestic Commodity Flow Value {.tabset .tabset-fade}
+-------------------------------------------------------------
+
+### Commodity Flows Within Zones
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCommodityFlows[Move.Type=="Within Zones"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Table))+geom_bar(aes(y=Value),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Value",x="Commodity")+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+
+
+ggplotly(p)
+```
+
+### Commodity Flows Between Zones
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCommodityFlows[Move.Type=="Between Zones"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Table))+geom_bar(aes(y=Value),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Value",x="Commodity")+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+
+
+ggplotly(p)
+```
+
+
+Domestic Commodity Flow Value {.tabset .tabset-fade}
+-------------------------------------------------------------
+
+### Commodity Flows Within Zones
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCommodityFlows[Move.Type=="Within Zones"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Table))+geom_bar(aes(y=Tonmiles),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Ton-miles",x="Commodity")+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+
+
+ggplotly(p)
+```
+
+### Commodity Flows Between Zones
+
+```{r,echo=FALSE,fig.height=9}
+p <- DomesticCommodityFlows[Move.Type=="Between Zones"] %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Table))+geom_bar(aes(y=Tonmiles),stat="identity",position="dodge") + scale_fill_manual(values=makeMoreColors(2)) +scale_y_continuous(limits=c(0,NA))+ labs(y="Ton-miles",x="Commodity")+facet_grid(.~Mode.Domestic,scales = "free_x")+theme_db+coord_flip()+theme(axis.text.x=element_text(angle=90))
+
+
+
+ggplotly(p)
+```
+
+
+<!-- International Commodity Flow {.tabset .tabset-fade} -->
+<!-- ----------------------------------------------------- -->
+
+<!-- ### Domestic Mode Tonnage -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCommodityFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0)),by=.(SCTG,Mode.Domestic,Move.Type)][order(SCTG,Move.Type,Mode.Domestic)] -->
+
+
+<!-- ImpExpDomesticCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Domestic))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=modeColors2) +scale_y_continuous(limits=c(0,NA))+ labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Domestic Mode Value -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Domestic))+geom_bar(aes(y=Value),stat="identity",position="stack") + scale_fill_manual(values=modeColors2) +scale_y_continuous(limits=c(0,NA))+ labs(y="Value",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Domestic Mode Ton-miles -->
+
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows %>% ggplot(aes(x=reorder(SCTGLabels,SCTG,function(x) unique(x)),fill=Mode.Domestic))+geom_bar(aes(y=Tonmiles),stat="identity",position="stack") + scale_fill_manual(values=modeColors2) +scale_y_continuous(limits=c(0,NA))+ labs(y="Ton-miles",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(.~Move.Type,scales = "free_x")+theme_db+coord_flip() -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Domestic Mode (Import) -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCommodityFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits=0),Tonmiles=comma(sum(Tonmiles)/1000000,digits = 0),Value=comma(sum(Value)/1000000,digits = 0)),by=.(Trade.Type,SCTG,Mode.Domestic,Move.Type)][order(Trade.Type,SCTG,Move.Type,Mode.Domestic)] -->
+
+
+<!-- ImpExpDomesticCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows[Trade.Type=="Import"] %>% ggplot(aes(x=reorder(SCTGLabels,Tonnage,function(x) -mean(x)),fill=Mode.Domestic))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(8)) + labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(Move.Type~.,scales = "free_x")+theme_db+theme(axis.text.x = element_text(angle = 60)) -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Domestic Mode (Export) -->
+
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows[Trade.Type=="Export"] %>% ggplot(aes(x=reorder(SCTGLabels,Tonnage,function(x) -mean(x)),fill=Mode.Domestic))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(7)) + labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(Move.Type~.,scales = "free_x")+theme_db+theme(axis.text.x = element_text(angle = 60)) -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Foreign Mode (Total) -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCommodityFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits = 0)),by=.(SCTG,Mode.Foreign,Move.Type)][order(SCTG,Move.Type,Mode.Foreign)] -->
+
+
+<!-- ImpExpDomesticCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows %>% ggplot(aes(x=reorder(SCTGLabels,Tonnage,function(x) -mean(x)),fill=Mode.Foreign))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(8)) + labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(Move.Type~.,scales = "free_x")+theme_db+theme(axis.text.x = element_text(angle = 60)) -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Foreign Mode (Import) -->
+
+<!-- ```{r,echo=FALSE, include=FALSE} -->
+<!-- ImpExpDomesticCommodityFlows <- Flows[Trade.Type!="Domestic",.(Tonnage=comma(sum(Tons)/1000,digits = 0)),by=.(Trade.Type,SCTG,Mode.Foreign,Move.Type)][order(Trade.Type,SCTG,Move.Type,Mode.Foreign)] -->
+
+
+<!-- ImpExpDomesticCommodityFlows[,SCTGLabels:= latestSCTGCodes[SCTG,Label]] -->
+
+<!-- ``` -->
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows[Trade.Type=="Import"] %>% ggplot(aes(x=reorder(SCTGLabels,Tonnage,function(x) -mean(x)),fill=Mode.Foreign))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(8)) + labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(Move.Type~.,scales = "free_x")+theme_db+theme(axis.text.x = element_text(angle = 60)) -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Foreign Mode (Export) -->
+
+
+<!-- ```{r,echo=FALSE,fig.height=9} -->
+<!-- p <- ImpExpDomesticCommodityFlows[Trade.Type=="Export"] %>% ggplot(aes(x=reorder(SCTGLabels,Tonnage,function(x) -mean(x)),fill=Mode.Foreign))+geom_bar(aes(y=Tonnage),stat="identity",position="stack") + scale_fill_manual(values=makeMoreColors(7)) + labs(y="Tonnage",x="Commodity")+guides(fill=guide_legend("Mode"))+facet_grid(Move.Type~.,scales = "free_x")+theme_db+theme(axis.text.x = element_text(angle = 60)) -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+
+Regional Flow Chart {data-navmenu="National"}
+===================================================
+
+Flows {data-height=550 .tabset .tabset-fade}
+----------------------------
+
+### Tonnage
+```{r,echo=FALSE,fig.height=9}
+DomesticRegionFlows <- Flows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Origin.Region,Destination.Region,Mode.Domestic)]
+
+ModelDomesticRegionFlows <- ModelFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Origin.Region,Destination.Region,Mode.Domestic)]
+
+DomesticRegionFlows <- rbind(DomesticRegionFlows,ModelDomesticRegionFlows)
+rm(ModelDomesticRegionFlows)
+
+p <- DomesticRegionFlows[!is.na(Origin.Region)&!is.na(Destination.Region)] %>% ggplot(aes(x=Mode.Domestic,y=Tonnage))+geom_bar(aes(fill=Table),stat="identity",position="dodge")+facet_grid(Origin.Region~Destination.Region,scales = "free_y")+theme_db+scale_fill_manual(values=makeMoreColors(2))+labs(x="Domestic Mode",y="Tonnage")
+
+ggplotly(p)
+```
+
+
+### Value
+```{r,echo=FALSE,fig.height=9}
+
+p <- DomesticRegionFlows[!is.na(Origin.Region)&!is.na(Destination.Region)] %>% ggplot(aes(x=Mode.Domestic,y=Value))+geom_bar(aes(fill=Table),stat="identity",position="dodge")+facet_grid(Origin.Region~Destination.Region,scales = "free_y")+theme_db+scale_fill_manual(values=makeMoreColors(2))+labs(x="Domestic Mode",y="Value")
+
+ggplotly(p)
+```
+
+### Ton-miles
+```{r,echo=FALSE,fig.height=9}
+
+p <- DomesticRegionFlows[!is.na(Origin.Region)&!is.na(Destination.Region)] %>% ggplot(aes(x=Mode.Domestic,y=Tonmiles))+geom_bar(aes(fill=Table),stat="identity",position="dodge")+facet_grid(Origin.Region~Destination.Region,scales = "free_y")+theme_db+scale_fill_manual(values=makeMoreColors(2))+labs(x="Domestic Mode",y="Ton-miles")
+
+ggplotly(p)
+```
+
