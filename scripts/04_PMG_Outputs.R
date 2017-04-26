@@ -37,7 +37,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
     stop(paste0("Expected file does not exist: '", naicsLogPath, "'!"))
   }
   naicslog <- readLines(naicsLogPath)
-  if(length(naicsLog) == 0) {
+  if(length(naicslog) == 0) {
     stop(
       paste0(
         "'",
