@@ -66,7 +66,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
     file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt"))
   file.create(log_file_path)
 
-  naicsInProcess[[naics]] <- list() #create place to accumulate group results
+  naicsInProcess[[paste0("naics-",naics)]] <- list() #create place to accumulate group results
   print(paste0('in outer loop names(naicsInProcess): ', paste0(collapse=", ", names(naicsInProcess))))
   flush.console()
 
@@ -171,7 +171,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
         task_log_file_path <-
           file.path(outputdir, paste0(taskInfo$taskNaics, "_PMGRun_Log.txt"))
 
-        groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
+        naicsKey <- paste0("naics-",taskInfo$taskNaics)
+        groupoutputs <- naicsInProcess[[naicsKey]]
         if (is.null(groupoutputs)) {
           stop(paste0("for taskInfo$taskNaics ", taskInfo$taskNaics, " naicsInProcess[[taskInfo$taskNaics]] (groupoutputs) is NULL! "))
         }
@@ -183,7 +184,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
         print(paste0('in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
         flush.console()
 
-        groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
+        groupoutputs <- naicsInProcess[[naicsKey]]
         print(paste0(' after retrieval in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
         flush.console()
 
@@ -213,7 +214,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
           stop(msg)
         }
         if (length(groupoutputs) == taskInfo$taskGroups) {
-          naicsInProcess[[taskInfo$taskNaics]] <<-
+          naicsInProcess[[naicsKey]] <<-
             NULL #delete naic from tracked outputs
           write(print(
             paste0(

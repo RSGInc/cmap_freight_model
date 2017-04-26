@@ -360,7 +360,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         load(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".Rdata")))
 
-        groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
+        naicsKey <- paste0("naics-",taskInfo$taskNaics)
+        groupoutputs <- naicsInProcess[[naicsKey]]
         groupoutputs[[paste0("group-",taskInfo$taskGroup)]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
@@ -382,7 +383,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
             file.path(outputdir, paste0(taskInfo$taskNaics, ".Rdata"))
           load(naicsRDataFile)
           pairs <- rbindlist(groupoutputs)
-          naicsInProcess[[taskInfo$taskNaics]] <<-
+          naicsInProcess[[naicsKey]] <<-
             NULL #delete naic from tracked outputs
           pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 
