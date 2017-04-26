@@ -273,16 +273,21 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
   setkey(consc, Size)
   setkey(prodc, Size)
 
-  print(paste0("create_pmg_sample_groups(naics=", naics, ", groups=", groups, ", sprod=", sprod, ") called. nrow(consc)=", nrow(consc), " nrow(prodc)=", nrow(prodc)))
+  #print(paste0("create_pmg_sample_groups(naics=", naics, ", groups=", groups, ", sprod=", sprod, ") called. nrow(consc)=", nrow(consc), " nrow(prodc)=", nrow(prodc)))
   #add group id and number of groups to consc and prodc; if not splitting producers assign 0
-  consc[,numgroups:=groups]
-  prodc[,numgroups:=groups]
-  consc[,group:=1:groups]
-  if(sprod==1){
-    prodc[,group:=1:groups]
-  } else {
-    prodc[,group:=0]
-  }
+
+  # This code is randomly assigning items into groups. The fact that the number of items is not necessarily divisible
+  # by the number of groups is expected and not a problem so we suppress the warnings
+  suppressWarnings({
+    consc[,numgroups:=groups]
+    prodc[,numgroups:=groups]
+    consc[,group:=1:groups]
+    if(sprod==1){
+      prodc[,group:=1:groups]
+    } else {
+      prodc[,group:=0]
+    }
+  })
   #Check that for all groups the capacity > demand
   #to much demand overall?
   prodconsratio <- sum(prodc$OutputCapacityTons)/sum(consc$PurchaseAmountTons)
