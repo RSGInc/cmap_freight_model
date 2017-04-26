@@ -85,13 +85,13 @@ runPMGLocal <-
       print(paste("log_folder:", log_folder))
 
     if (writelog) {
-      log_file_path <-
+      pmg_log_file_path <-
         normalizePath(file.path(log_folder, paste0(naics_io_code,
                                                    "_g",
-                                                   groupnum)))
-      file.create(log_file_path)
+                                                   groupnum, ".txt")))
+      file.create(pmg_log_file_path)
     } else {
-      log_file_path <- ""
+      pmg_log_file_path <- ""
     }
 
     if (writelog)
@@ -102,10 +102,10 @@ runPMGLocal <-
           naics_io_code,
           "group:",
           groupnum,
-          "log_file_path:",
-          log_file_path
+          "pmg_log_file_path:",
+          pmg_log_file_path
         )
-      ), file = log_file_path, append = TRUE)
+      ), file = pmg_log_file_path, append = TRUE)
 
 
     #location of PMG executable: in the PMG folder, called PMG.exe
@@ -122,7 +122,7 @@ runPMGLocal <-
           "pmgexe: ",
           pmgexe
         )
-      ), file = log_file_path, append = TRUE)
+      ), file = pmg_log_file_path, append = TRUE)
 
     #command line options
     # 1.  Specify ini file path:
@@ -141,7 +141,7 @@ runPMGLocal <-
           "inipath:",
           inipath
         )
-      ), file = log_file_path, append = TRUE)
+      ), file = pmg_log_file_path, append = TRUE)
 
     # 2. specify data input and output file name prefixes
     # -p naics_io_code
@@ -159,7 +159,7 @@ runPMGLocal <-
           "ioprefix:",
           ioprefix
         )
-      ), file = log_file_path, append = TRUE)
+      ), file = pmg_log_file_path, append = TRUE)
 
 
     # 3. specify data directory path for input files files
@@ -178,7 +178,7 @@ runPMGLocal <-
           "inpath:",
           inpath
         )
-      ), file = log_file_path, append = TRUE)
+      ), file = pmg_log_file_path, append = TRUE)
 
     # 4. specify directory path for output file
     # locations of naics_io_code.out.csv
@@ -197,14 +197,14 @@ runPMGLocal <-
           "outpath:",
           outpath
         )
-      ), file = log_file_path, append = TRUE)
+      ), file = pmg_log_file_path, append = TRUE)
 
     #
     #build system call:
     system2(
       pmgexe,
       args = paste("-i", inipath, "-p", ioprefix, "-d", inpath, "-o", outpath),
-      stdout = log_file_path,
+      stdout = pmg_log_file_path,
       invisible = invisible,
       wait = wait
     )
@@ -219,7 +219,7 @@ runPMGLocal <-
           "group:",
           groupnum
         )
-      ), file = log_file_path, append = TRUE)
+      ), file = pmg_log_file_path, append = TRUE)
 
   } #end runPMGLocal
 
