@@ -224,7 +224,7 @@ runPMGLocal <-
   } #end runPMGLocal
 
 #list to hold the group outputs for any currently running naics
-pmgoutputs <- list()
+naicsInProcess <- list()
 
 load(file.path(outputdir, "naics_set.Rdata"))
 naics_set <-
@@ -263,7 +263,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
   file = log_file_path,
   append = TRUE)
 
-  pmgoutputs[[naics]] <<- list() #create place to accumulate group results
+  naicsInProcess[[naics]] <- list() #create place to accumulate group results
 
   #loop over the groups and run the games, and process outputs
   for (g in 1:groups) {
@@ -360,7 +360,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         load(file.path(outputdir, paste0(taskInfo$taskNaics, "_g", taskInfo$taskGroup, ".Rdata")))
 
-        groupoutputs <- pmgoutputs[[taskInfo$taskNaics]]
+        groupoutputs <- naicsInProcess[[taskInfo$taskNaics]]
         groupoutputs[[taskInfo$taskGroup]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
 
@@ -382,7 +382,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
             file.path(outputdir, paste0(taskInfo$taskNaics, ".Rdata"))
           load(naicsRDataFile)
           pairs <- rbindlist(groupoutputs)
-          pmgoutputs[[taskInfo$taskNaics]] <<-
+          naicsInProcess[[taskInfo$taskNaics]] <<-
             NULL #delete naic from tracked outputs
           pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 
@@ -408,10 +408,10 @@ for (naics_run_number in 1:nrow(naics_set)) {
 #wait until all tasks are finished
 processRunningTasks(wait = TRUE, debug = TRUE)
 
-if (length(pmgoutputs) != 0) {
+if (length(naicsInProcess) != 0) {
   stop(paste(
     "At end of Run_PMG there were still some unfinished naics! Unfinished: ",
-    paste0(collapse = ", ", names(pmgoutputs))
+    paste0(collapse = ", ", names(naicsInProcess))
   ))
 }
 

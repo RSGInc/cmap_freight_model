@@ -64,7 +64,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
     file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt"))
   file.create(log_file_path)
 
-  naicsInProcess[[naics]] <<- list() #create place to accumulate group results
+  naicsInProcess[[naics]] <- list() #create place to accumulate group results
 
   write(print(
     paste0(

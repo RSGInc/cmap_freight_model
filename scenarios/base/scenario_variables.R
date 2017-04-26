@@ -109,7 +109,7 @@ pmgmonitoring <- TRUE
 pmgnaicstorun <- c(
   326220, 212230,336414, 332420
   #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330
-  ,113000, 211000,212100
+  #,113000, 211000,212100
 )
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
