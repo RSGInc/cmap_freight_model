@@ -263,7 +263,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
   file = log_file_path,
   append = TRUE)
 
-  naicsInProcess[[naics]] <- list() #create place to accumulate group results
+  naicsInProcess[[paste0("naics-",naics)]] <- list() #create place to accumulate group results
 
   #loop over the groups and run the games, and process outputs
   for (g in 1:groups) {
@@ -362,11 +362,9 @@ for (naics_run_number in 1:nrow(naics_set)) {
 
         naicsKey <- paste0("naics-",taskInfo$taskNaics)
         groupoutputs <- naicsInProcess[[naicsKey]]
-        groupoutputs[[paste0("group-",taskInfo$taskGroup)]] <-
+        groupKey <- paste0("group-",taskInfo$taskGroup)
+        groupoutputs[[groupKey]] <-
           merge(pc, pmgout, by = c("BuyerID", "SellerID"))
-
-        #Don't think I should have to do this it seems I must but re-store list in global
-        naicsInProcess[[naicsKey]] <<- groupoutputs
 
         rm(pmgout, pc)
         write(print(paste0(Sys.time(),
@@ -386,18 +384,23 @@ for (naics_run_number in 1:nrow(naics_set)) {
             file.path(outputdir, paste0(taskInfo$taskNaics, ".Rdata"))
           load(naicsRDataFile)
           pairs <- rbindlist(groupoutputs)
-          naicsInProcess[[naicsKey]] <<-
-            NULL #delete naic from tracked outputs
           pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 
           pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
           save(consc, prodc, pairs, file = naicsRDataFile)
+
+          #delete naic from tracked outputs
+          naicsInProcess[[naicsKey]] <<- NULL
+
           write(print(
             paste0(
               Sys.time(),
               ": Completed Processing Outputs of all ",
               taskInfo$taskGroups,
-              " groups for naics ", taskInfo$taskNaics
+              " groups for naics ",
+              taskInfo$taskNaics,
+              ". Remaining naicsInProcess=",
+              paste0(collapse=", ", names(naicsInProcess))
             )
           ), file = task_log_file_path, append = TRUE)
         } #end if all groups in naic are finished

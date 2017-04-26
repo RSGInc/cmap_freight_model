@@ -67,8 +67,6 @@ for (naics_run_number in 1:nrow(naics_set)) {
   file.create(log_file_path)
 
   naicsInProcess[[paste0("naics-",naics)]] <- list() #create place to accumulate group results
-  print(paste0('in outer loop names(naicsInProcess): ', paste0(collapse=", ", names(naicsInProcess))))
-  flush.console()
 
   write(print(
     paste0(
@@ -176,19 +174,10 @@ for (naics_run_number in 1:nrow(naics_set)) {
         if (is.null(groupoutputs)) {
           stop(paste0("for taskInfo$taskNaics ", taskInfo$taskNaics, " naicsInProcess[[taskInfo$taskNaics]] (groupoutputs) is NULL! "))
         }
-        print(paste0('in callback names(naicsInProcess): ', paste0(collapse=", ", names(naicsInProcess))))
-        flush.console()
 
         groupKey <- paste0("group-",taskInfo$taskGroup)
         groupoutputs[[groupKey]] <-
           paste0(Sys.time(), ": Finished!")
-        print(paste0('in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
-        flush.console()
-
-        naicsInProcess[[naicsKey]] <<- groupoutputs #should not have to do this but re-store list in global
-        groupoutputs <- naicsInProcess[[naicsKey]]
-        print(paste0(' after retrieval in callback names(groupoutputs): ', paste0(collapse=", ", names(groupoutputs))))
-        flush.console()
 
         costs_file_path <-
           file.path(outputdir,
@@ -216,8 +205,8 @@ for (naics_run_number in 1:nrow(naics_set)) {
           stop(msg)
         }
         if (length(groupoutputs) == taskInfo$taskGroups) {
-          naicsInProcess[[naicsKey]] <<-
-            NULL #delete naic from tracked outputs
+          #delete naic from tracked outputs
+          naicsInProcess[[naicsKey]] <<- NULL
           write(print(
             paste0(
               Sys.time(),
