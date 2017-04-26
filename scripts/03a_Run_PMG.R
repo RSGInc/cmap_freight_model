@@ -386,11 +386,28 @@ for (naics_run_number in 1:nrow(naics_set)) {
           naicsRDataFile <-
             file.path(outputdir, paste0(taskInfo$taskNaics, ".Rdata"))
           load(naicsRDataFile)
+          write(print(
+            paste0("loaded '", naicsRDataFile, "' nrow(consc)=", nrow(consc), " nrow(prodc)=", nrow(prodc))))
           pairs <- rbindlist(groupoutputs)
           pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 
           pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
+          write(print(
+            paste0("loaded '", naicsRDataFile, "' nrow(consc)=", nrow(consc), " nrow(prodc)=", nrow(prodc))))
           save(consc, prodc, pairs, file = naicsRDataFile)
+          rm(consc, prodc, pairs)
+
+          write(print(
+            paste0(
+              Sys.time(),
+              ": Completed Processing Outputs of all ",
+              taskInfo$taskGroups,
+              " groups for naics ",
+              taskInfo$taskNaics,
+              ". Remaining naicsInProcess=",
+              paste0(collapse=", ", names(naicsInProcess))
+            )
+          ), file = task_log_file_path, append = TRUE)
 
           #delete naic from tracked outputs
           naicsInProcess[[naicsKey]] <<- NULL
