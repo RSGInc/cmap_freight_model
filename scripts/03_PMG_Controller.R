@@ -25,9 +25,18 @@ rScriptCmd <-
     model$basedir,
     model$outputdir
   )
-print(paste0(Sys.time(), ": Starting rScriptCmd: ", rScriptCmd))
+
+startTime <- Sys.time()
+print(paste0(startTime, ": Starting rScriptCmd: ", rScriptCmd))
 exitStatus <- system(rScriptCmd, wait = TRUE)
-print(paste0(Sys.time(), ": Finished rScriptCmd: ", rScriptCmd))
+finishTime <- Sys.time()
+print(paste0(
+  finishTime,
+  ": Finished rScriptCmd: ",
+  rScriptCmd,
+  ". Time to run: ",
+  format(finishTime - startTime)
+))
 if (exitStatus != 0) {
   stop(paste0(
     "ERROR exitStatus: ",
@@ -60,14 +69,21 @@ if (model$scenvars$pmgmonitoring)
   )
 
 rScriptCmd <-
-  paste(
-    "Rscript .\\scripts\\03a_Run_PMG.R",
-    model$basedir,
-    model$outputdir
-  )
-print(paste0(Sys.time(), ": Starting rScriptCmd: ", rScriptCmd))
+  paste("Rscript .\\scripts\\03a_Run_PMG.R",
+        model$basedir,
+        model$outputdir)
+
+startTime <- Sys.time()
+print(paste0(startTime, ": Starting rScriptCmd: ", rScriptCmd))
 exitStatus <- system(rScriptCmd, wait = TRUE)
-print(paste0(Sys.time(), ": Finished rScriptCmd: ", rScriptCmd))
+finishTime <- Sys.time()
+print(paste0(
+  finishTime,
+  ": Finished rScriptCmd: ",
+  rScriptCmd,
+  ". Time to run: ",
+  format(finishTime - startTime)
+))
 if (exitStatus != 0) {
   stop(paste0(
     "ERROR exitStatus: ",

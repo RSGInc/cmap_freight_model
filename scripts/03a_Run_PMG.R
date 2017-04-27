@@ -386,14 +386,24 @@ for (naics_run_number in 1:nrow(naics_set)) {
           naicsRDataFile <-
             file.path(outputdir, paste0(taskInfo$taskNaics, ".Rdata"))
           load(naicsRDataFile)
-          write(print(
-            paste0("loaded '", naicsRDataFile, "' nrow(consc)=", nrow(consc), " nrow(prodc)=", nrow(prodc))))
           pairs <- rbindlist(groupoutputs)
           pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 
           pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
           write(print(
-            paste0("loaded '", naicsRDataFile, "' nrow(consc)=", nrow(consc), " nrow(prodc)=", nrow(prodc))))
+            paste0(
+              Sys.time(),
+              ": loaded and then re-saved with'",
+              naicsRDataFile,
+              "'",
+              " nrow(consc)=",
+              nrow(consc),
+              " nrow(prodc)=",
+              nrow(prodc),
+              " nrow(pairs)=",
+              nrow(pairs)
+            )
+          ))
           save(consc, prodc, pairs, file = naicsRDataFile)
           rm(consc, prodc, pairs)
 
