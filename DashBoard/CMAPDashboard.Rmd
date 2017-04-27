@@ -165,17 +165,17 @@ FAFZonescurrentVersion[,Version:=NULL]
 FAFZonescurrentVersion[,State:=as.character(State)]
 setkey(FAFZonescurrentVersion,FAFZone)
 
-file_location <- "../scenarios/base/outputs/pairs.Rdata"
+file_location <- "../scenarios/base/old_outputs/pairs.Rdata"
 # Check if it's an old file
 isOld <- ifelse(grepl("old",file_location),TRUE,FALSE)
 
 ModelFlows <- get(load(file_location))
 
 # To match the with the older version
-if(isOld){setnames(ModelFlows,old=c("pzone","czone","SCTG"),new = c("Production_zone","Consumption_zone","Commodity_SCTG"))}
+# if(isOld){setnames(ModelFlows,old=c("pzone","czone","SCTG"),new = c("Production_zone","Consumption_zone","Commodity_SCTG"))}
 
-rm(pairs)
-gc()
+# rm(pairs)
+# gcgit ()
 
 
 ModelFlows[, Tons := Last.Iteration.Quantity * lbstoTons]
@@ -1027,7 +1027,7 @@ countDomestic <- DomesticFlows[,.N,by=.(Move.Type,Table)]
 countInternationalDomestic <- ImpExpDomesticFlows[,.N,by=.(Move.Type,Trade.Type,Table)]
 countInternationalInternational <- ImpExpInternationalFlows[,.N,by=.(Move.Type,Trade.Type,Table)]
 
-sketchCMAP <- with(tags,table(
+sketchNational <- with(tags,table(
     thead(
         tr(
             th(colspan=1,rowspan=4,"Mode"),
