@@ -129,7 +129,10 @@ setkey(modeCategories,ModeNumber)
 Flows <- suppressWarnings(getFAFData(year = selectYear))
 ## Note: Observed that some tonmiles are 0 while tons are greater than 0.
 
-Flows[,':='(Move.Type=ifelse(Origin.Domestic==Destination.Domestic,"Within Zones","Between Zones"))]
+Flows[Origin.Domestic==Destination.Domestic,Move.Type:="Within Zones"]
+Flows[Origin.Domestic!=Destination.Domestic,Move.Type:="Between Zones"]
+
+# Flows[,':='(Move.Type=ifelse(Origin.Domestic==Destination.Domestic,"Within Zones","Between Zones"))]
 
 Flows[,':='(Origin.Region=stateRegion[.(Origin.State),Region],
             Origin.SubRegion=stateRegion[.(Origin.State),SubRegion],
@@ -138,64 +141,108 @@ Flows[,':='(Origin.Region=stateRegion[.(Origin.State),Region],
 
 CMAPFlows <- Flows[Origin.Domestic %in% CMAPFAFCodes | Destination.Domestic %in% CMAPFAFCodes]
 
-CMAPFlows[,':='(Move.Type=ifelse(Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,"Within",ifelse(Origin.Domestic %in% CMAPFAFCodes, "Out","In")))]
+CMAPFlows[Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,Move.Type:="Within"]
+CMAPFlows[Origin.Domestic %in% CMAPFAFCodes & !(Destination.Domestic %in% CMAPFAFCodes), Move.Type:="Out"]
+CMAPFlows[!(Origin.Domestic %in% CMAPFAFCodes) & Destination.Domestic %in% CMAPFAFCodes, Move.Type:="In"]
 
-CMAPFlows[,':='(Origin.Region=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.Region),
-                Origin.SubRegion=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.SubRegion),
-                Destination.Region=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.Region),
-                Destination.SubRegion=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.SubRegion))]
+# CMAPFlows[,':='(Move.Type=ifelse(Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,"Within",ifelse(Origin.Domestic %in% CMAPFAFCodes, "Out","In")))]
+
+CMAPFlows[Origin.Domestic %in% CMAPFAFCodes, Origin.Region:="CMAP"]
+CMAPFlows[Origin.Domestic %in% CMAPFAFCodes, Origin.SubRegion:="CMAP"]
+CMAPFlows[Destination.Domestic %in% CMAPFAFCodes, Destination.Region:="CMAP"]
+CMAPFlows[Destination.Domestic %in% CMAPFAFCodes, Destination.SubRegion:="CMAP"]
+
+# CMAPFlows[,':='(Origin.Region=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.Region),
+#                 Origin.SubRegion=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.SubRegion),
+#                 Destination.Region=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.Region),
+#                 Destination.SubRegion=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.SubRegion))]
 
 #####################################################################
 ######## Model Data ##############################################
 #####################################################################
+FAFZonescurrentVersion <- FAFZones[Version==getLatestFAFVersion()]
+FAFZonescurrentVersion[,Version:=NULL]
+FAFZonescurrentVersion[,State:=as.character(State)]
+setkey(FAFZonescurrentVersion,FAFZone)
 
 file_location <- "../scenarios/base/outputs/pairs.Rdata"
 # Check if it's an old file
 isOld <- ifelse(grepl("old",file_location),TRUE,FALSE)
 
-load(file_location)
-
-
-FAFZonescurrentVersion <- FAFZones[Version==getLatestFAFVersion()]
-FAFZonescurrentVersion[,Version:=NULL]
-FAFZonescurrentVersion[,State:=as.character(State)]
-setkey(FAFZonescurrentVersion,FAFZone)
-ModelFlows <- pairs
-rm(pairs)
-gc()
+ModelFlows <- get(load(file_location))
 
 # To match the with the older version
 if(isOld){setnames(ModelFlows,old=c("pzone","czone","SCTG"),new = c("Production_zone","Consumption_zone","Commodity_SCTG"))}
 
-ModelFlows[,c("Tons","Tonmiles","Value","Trade.Type"):=.(Last.Iteration.Quantity*lbstoTons,Last.Iteration.Quantity*lbstoTons*Distance,Last.Iteration.Quantity*ConVal/PurchaseAmountTons,ifelse(Production_zone<=273 & Consumption_zone<=273,"Domestic",ifelse(Production_zone<=273,"Export","Import")))]
+rm(pairs)
+gc()
+
+
+ModelFlows[, Tons := Last.Iteration.Quantity * lbstoTons]
+ModelFlows[, Tonmiles := Tons * Distance]
+ModelFlows[, Value := Last.Iteration.Quantity * ConVal / PurchaseAmountTons]
+ModelFlows[Production_zone <= 273 & Consumption_zone <= 273, Trade.Type := "Domestic"]
+ModelFlows[Production_zone > 273 & Consumption_zone <= 273, Trade.Type := "Import"]
+ModelFlows[Production_zone <= 273 & Consumption_zone > 273, Trade.Type := "Export"]
+
 
 
 # Assign FAF zones to origin and destination
-ModelFlows[,":="(Origin.Domestic=ifelse(Trade.Type!="Import",mesoFAFCBPMap[.(Production_zone),FAFZONE],NA),
-            Origin.Foreign=ifelse(Trade.Type=="Import",mesoFAFCBPMap[.(Production_zone),FAFZONE],NA),
-            Destination.Domestic=ifelse(Trade.Type!="Export",mesoFAFCBPMap[.(Consumption_zone),FAFZONE],NA),
-            Destination.Foreign=ifelse(Trade.Type=="Export",mesoFAFCBPMap[.(Consumption_zone),FAFZONE],NA))]
 
+ModelFlows[Trade.Type!="Import",Origin.Domestic:=mesoFAFCBPMap[.(Production_zone),FAFZONE]]
+ModelFlows[Trade.Type=="Import",Origin.Foreign:=mesoFAFCBPMap[.(Production_zone),FAFZONE]]
+ModelFlows[Trade.Type!="Export",Destination.Domestic:=mesoFAFCBPMap[.(Consumption_zone),FAFZONE]]
+ModelFlows[Trade.Type=="Export",Destination.Foreign:=mesoFAFCBPMap[.(Consumption_zone),FAFZONE]]
+
+# ModelFlows[,":="(Origin.Domestic=ifelse(Trade.Type!="Import",mesoFAFCBPMap[.(Production_zone),FAFZONE],NA),
+#             Origin.Foreign=ifelse(Trade.Type=="Import",mesoFAFCBPMap[.(Production_zone),FAFZONE],NA),
+#             Destination.Domestic=ifelse(Trade.Type!="Export",mesoFAFCBPMap[.(Consumption_zone),FAFZONE],NA),
+#             Destination.Foreign=ifelse(Trade.Type=="Export",mesoFAFCBPMap[.(Consumption_zone),FAFZONE],NA))]
+
+##############################################################
 # Assign states to origin and destination
-ModelFlows[,":="(Origin.State=ifelse(Trade.Type!="Import",FAFZonescurrentVersion[.(Origin.Domestic),State],NA),Destination.State=ifelse(Trade.Type!="Export",FAFZonescurrentVersion[.(Destination.Domestic),State],NA))]
+##############################################################
+
+ModelFlows[Trade.Type!="Import",Origin.State:=FAFZonescurrentVersion[.(Origin.Domestic),State]]
+ModelFlows[Trade.Type!="Export",Destination.State:=FAFZonescurrentVersion[.(Destination.Domestic),State]]
+
+
+# ModelFlows[,":="(Origin.State=ifelse(Trade.Type!="Import",FAFZonescurrentVersion[.(Origin.Domestic),State],NA),Destination.State=ifelse(Trade.Type!="Export",FAFZonescurrentVersion[.(Destination.Domestic),State],NA))]
+
+
 
 ModelFlows[,':='(Origin.Region=stateRegion[.(Origin.State),Region],
             Origin.SubRegion=stateRegion[.(Origin.State),SubRegion],
             Destination.Region=stateRegion[.(Destination.State),Region],
             Destination.SubRegion=stateRegion[.(Destination.State),SubRegion])]
 
-ModelFlows[,Mode.Domestic:=ifelse(Trade.Type=="Domestic",modeCategories[.(MinPath),Mode],NA)]
+ModelFlows[Trade.Type=="Domestic",Mode.Domestic:=modeCategories[.(MinPath),Mode]]
+
+# ModelFlows[,Mode.Domestic:=ifelse(Trade.Type=="Domestic",modeCategories[.(MinPath),Mode],NA)]
 
 ModelCMAPFlows <- ModelFlows[Origin.Domestic %in% CMAPFAFCodes | Destination.Domestic %in% CMAPFAFCodes]
 
-ModelCMAPFlows[,':='(Move.Type=ifelse(Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,"Within",ifelse(Origin.Domestic %in% CMAPFAFCodes, "Out","In")))]
+ModelCMAPFlows[Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,Move.Type:="Within"]
+ModelCMAPFlows[Origin.Domestic %in% CMAPFAFCodes & !(Destination.Domestic %in% CMAPFAFCodes), Move.Type:="Out"]
+ModelCMAPFlows[!(Origin.Domestic %in% CMAPFAFCodes) & Destination.Domestic %in% CMAPFAFCodes, Move.Type:="In"]
 
-ModelFlows[,':='(Move.Type=ifelse(Origin.Domestic==Destination.Domestic,"Within Zones","Between Zones"))]
+# ModelCMAPFlows[,':='(Move.Type=ifelse(Origin.Domestic %in% CMAPFAFCodes & Destination.Domestic %in% CMAPFAFCodes,"Within",ifelse(Origin.Domestic %in% CMAPFAFCodes, "Out","In")))]
 
-ModelCMAPFlows[,':='(Origin.Region=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.Region),
-                Origin.SubRegion=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.SubRegion),
-                Destination.Region=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.Region),
-                Destination.SubRegion=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.SubRegion))]
+ModelFlows[Origin.Domestic==Destination.Domestic,Move.Type:="Within Zones"]
+ModelFlows[Origin.Domestic!=Destination.Domestic,Move.Type:="Between Zones"]
+
+# ModelFlows[,':='(Move.Type=ifelse(Origin.Domestic==Destination.Domestic,"Within Zones","Between Zones"))]
+
+ModelCMAPFlows[Origin.Domestic %in% CMAPFAFCodes, Origin.Region:="CMAP"]
+ModelCMAPFlows[Origin.Domestic %in% CMAPFAFCodes, Origin.SubRegion:="CMAP"]
+ModelCMAPFlows[Destination.Domestic %in% CMAPFAFCodes, Destination.Region:="CMAP"]
+ModelCMAPFlows[Destination.Domestic %in% CMAPFAFCodes, Destination.SubRegion:="CMAP"]
+
+
+# ModelCMAPFlows[,':='(Origin.Region=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.Region),
+#                 Origin.SubRegion=ifelse(Origin.Domestic %in% CMAPFAFCodes,"CMAP",Origin.SubRegion),
+#                 Destination.Region=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.Region),
+#                 Destination.SubRegion=ifelse(Destination.Domestic %in% CMAPFAFCodes,"CMAP",Destination.SubRegion))]
 
 
 
