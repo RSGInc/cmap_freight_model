@@ -215,7 +215,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
   x_write=c(naics,iSCTG,numrows,numrows2,length(paths))
   write(x_write, recycle_check_file_path, ncolumns =length(x_write), append=TRUE)
   endTime <- Sys.time()
-  print(paste0(startTime, " Exiting after elapsed time ", format(endTime-startTime), ", ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
+  print(paste0(endTime, " Exiting after elapsed time ", format(endTime-startTime), ", ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
   return(dfsp)
 } #minLogisticsCostSctgPaths
 
