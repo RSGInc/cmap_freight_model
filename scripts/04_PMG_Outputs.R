@@ -17,13 +17,11 @@ progressStart(pmgout, 3)
 #-----------------------------------------------------------------------------------
 progressNextStep("Combining PMG Output files")
 
-naicsrun <- 1L #counter
 load(file.path(model$outputdir, "naics_set.Rdata"))
 ### -- Heither, 02-24-2017: testing: no 327390
 #naics_set <- subset(naics_set, NAICS %in% c(324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
-naicstorun <- nrow(naics_set)
 naicspairs <- list() #list to hold the summarized outputs
 
 debug <- TRUE
@@ -62,17 +60,17 @@ for (naics_run_number in 1:nrow(naics_set)) {
     )
   }
 
-  print(paste(
-    "Reading Outputs from Industry",
-    naicsrun,
-    ":",
-    naics_set$NAICS[naicsrun]
+  print(paste0(
+    "Reading Outputs from Industry ",
+    naics_run_number,
+    ": ",
+    naics
   ))
-  load(file.path(model$outputdir, paste0(naics_set$NAICS[naicsrun], ".Rdata")))
+  load(file.path(model$outputdir, paste0(naics, ".Rdata")))
   #apply fix for bit64/data.table handling of large integers in rbindlist
   pairs[, Quantity.Traded := as.character(Quantity.Traded)]
   pairs[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
-  naicspairs[[naicsrun]] <- pairs
+  naicspairs[[naics_run_number]] <- pairs
 } #end for (naics_run_number in 1:nrow(naics_set))
 
 pairs <- rbindlist(naicspairs)
@@ -171,7 +169,7 @@ setkey(pair2, Production_zone, Consumption_zone)
 
 ### Calculate Domestic Linehaul-to-Port Mode
 df_fin <-
-  minLogisticsCost(pair2, 1, "NAICS_PALCEHOLDER", recycle_check_file_path)
+  minLogisticsCost(pair2, 1, "NAICS_PLACEHOLDER", recycle_check_file_path)
 setnames(df_fin,
          c("time", "path", "minc"),
          c("Attribute2_ShipTime", "MinPath", "MinGmnql"))
