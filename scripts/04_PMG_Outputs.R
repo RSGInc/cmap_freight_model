@@ -24,7 +24,6 @@ naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 naicspairs <- list() #list to hold the summarized outputs
 
-debug <- TRUE
 for (naics_run_number in 1:nrow(naics_set)) {
   naics <- naics_set$NAICS[naics_run_number]
 
