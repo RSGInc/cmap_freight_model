@@ -255,7 +255,7 @@ Tables {data-navmenu="CMAP" data-width=200 .tabset .tabset-fade}
 
 ### Tonnage
 ```{r createTablesCMAP, echo=FALSE}
-DomesticCMAPFlows <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Move.Type,Mode.Domestic)][order(Move.Type,-Tonnage)]
+DomesticCMAPFlows <- CMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Move.Type,Mode.Domestic)]
 
 ModelDomesticCMAPFlows <- ModelCMAPFlows[Trade.Type=="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="Model"),by=.(Move.Type,Mode.Domestic)]
 
@@ -267,7 +267,7 @@ DomesticCMAPFlows.V <- dcast(DomesticCMAPFlows,Mode.Domestic~Move.Type+Table,val
 DomesticCMAPFlows.TM <- dcast(DomesticCMAPFlows,Mode.Domestic~Move.Type+Table,value.var = "Tonmiles")
 
 
-ImpExpDomesticCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Domestic)][order(Trade.Type,Move.Type,-Tonnage)]
+ImpExpDomesticCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Domestic)]
 
 ###########################################################
 #### Commented out until the foreign and domestic modes are decided
@@ -282,7 +282,7 @@ ImpExpDomesticCMAPFlows.T <- dcast(ImpExpDomesticCMAPFlows,Mode.Domestic~Trade.T
 ImpExpDomesticCMAPFlows.V <- dcast(ImpExpDomesticCMAPFlows,Mode.Domestic~Trade.Type+Move.Type,value.var="Value")
 ImpExpDomesticCMAPFlows.TM <- dcast(ImpExpDomesticCMAPFlows,Mode.Domestic~Trade.Type+Move.Type,value.var="Tonmiles")
 
-ImpExpInternationalCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000),by=.(Trade.Type,Move.Type,Mode.Foreign)][order(Trade.Type,Move.Type,-Tonnage)]
+ImpExpInternationalCMAPFlows <- CMAPFlows[Trade.Type!="Domestic",.(Tonnage=sum(Tons)/1000,Tonmiles=sum(Tonmiles)/1000000,Value=sum(Value)/1000000,Table="FAF 2012"),by=.(Trade.Type,Move.Type,Mode.Foreign)]
 
 ###########################################################
 #### Commented out until the foreign and domestic modes are decided
@@ -302,31 +302,72 @@ TotalFlowsCMAP.V <- merge(merge(DomesticCMAPFlows.V,ImpExpDomesticCMAPFlows.V,by
 TotalFlowsCMAP.TM <- merge(merge(DomesticCMAPFlows.TM,ImpExpDomesticCMAPFlows.TM,by="Mode.Domestic"),ImpExpInternationalCMAPFlows.TM,by.x="Mode.Domestic",by.y="Mode.Foreign")
 
 
-
+countDomestic <- DomesticCMAPFlows[,.N,by=.(Move.Type,Table)]
+countInternationalDomestic <- ImpExpDomesticCMAPFlows[,.N,by=.(Move.Type,Trade.Type,Table)]
+countInternationalInternational <- ImpExpInternationalCMAPFlows[,.N,by=.(Move.Type,Trade.Type,Table)]
 
 sketchCMAP <- with(tags,table(
     thead(
         tr(
             th(colspan=1,rowspan=4,"Mode"),
-            th(colspan=5,rowspan=2, "Domesitc"),
-            th(colspan=6, "Domestic"),
-            th(colspan=6, "International")
+            th(colspan=countDomestic[,.N],rowspan=2, "Domesitc"),
+            th(colspan=countInternationalDomestic[,.N], "Domestic"),
+            th(colspan=countInternationalInternational[,.N], "International")
           ),
         tr(
-            th(colspan=3, "Import"),
-            th(colspan=3, "Export"),
-            th(colspan=3, "Import"),
-            th(colspan=3, "Export")
+            th(colspan=countInternationalDomestic[Trade.Type=="Import",.N], "Import"),
+            th(colspan=countInternationalDomestic[Trade.Type=="Export",.N], "Export"),
+            th(colspan=countInternationalInternational[Trade.Type=="Import",.N], "Import"),
+            th(colspan=countInternationalInternational[Trade.Type=="Export",.N], "Export")
         ),
         tr(
-            th(colspan=2, "In"),
-            th(colspan=2, "Out"),
-            th(colspan=1, "Within"),
-            lapply(rep(c("In","Out","Within"),4),th)
+            if((value <- countDomestic[Move.Type=="In",.N])>0) th(colspan=value, "In"),
+            if((value <- countDomestic[Move.Type=="Out",.N])>0) th(colspan=value, "Out"),
+            if((value <- countDomestic[Move.Type=="Within",.N])>0) th(colspan=value, "Within"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="In",.N])>0) th(colspan=value, "In"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Out",.N])>0) th(colspan=value, "Out"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Within",.N])>0) th(colspan=value, "Within"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="In",.N])>0) th(colspan=value, "In"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Out",.N])>0) th(colspan=value, "Out"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Within",.N])>0) th(colspan=value, "Within"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="In",.N])>0) th(colspan=value, "In"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Out",.N])>0) th(colspan=value, "Out"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Within",.N])>0) th(colspan=value, "Within"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="In",.N])>0) th(colspan=value, "In"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Out",.N])>0) th(colspan=value, "Out"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Within",.N])>0) th(colspan=value, "Within")
         ),
         tr(
-          lapply(rep(c("FAF 2012","Model"),2),th),
-          lapply(rep("FAF 2012",13),th)
+          if((value <- countDomestic[Move.Type=="In" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countDomestic[Move.Type=="In" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countDomestic[Move.Type=="Out" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countDomestic[Move.Type=="Out" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+          if((value <- countDomestic[Move.Type=="Within" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countDomestic[Move.Type=="Within" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="In" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="In" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Out" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Out" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+          if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Within" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Within" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="In" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="In" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Out" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Out" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+          if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Within" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Within" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+          if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="In" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="In" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Out" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Out" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+          if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Within" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Within" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="In" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="In" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Out" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Out" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+          if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Within" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Within" & Table=="Model",.N])>0) th(colspan=value, "Model")
         )
         )))
 
@@ -347,7 +388,7 @@ datatable(TotalFlowsCMAP.T,container=sketchCMAP,rownames=FALSE,extensions = 'Fix
                             bInfo = FALSE,
                             columnDefs = list(list(width = '20%')),
                             searching=FALSE,
-                            paging=FALSE)) %>% formatCurrency(2:18,currency="",digits=0) %>% formatStyle(columns=2:18,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:18]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:18])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+                            paging=FALSE)) %>% formatCurrency(2:ncol(TotalFlowsCMAP.T),currency="",digits=0) %>% formatStyle(columns=2:ncol(TotalFlowsCMAP.T),backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:ncol(TotalFlowsCMAP.T)]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:ncol(TotalFlowsCMAP.T)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
 
 
 
@@ -366,7 +407,7 @@ datatable(TotalFlowsCMAP.V,container=sketchCMAP,rownames=FALSE,extensions = 'Fix
                             bInfo = FALSE,
                             columnDefs = list(list(width = '20%')),
                             searching=FALSE,
-                            paging=FALSE)) %>% formatCurrency(2:18,digits=0) %>% formatStyle(columns=2:18,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:18]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:18])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+                            paging=FALSE)) %>% formatCurrency(2:ncol(TotalFlowsCMAP.V),digits=0) %>% formatStyle(columns=2:ncol(TotalFlowsCMAP.V),backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:ncol(TotalFlowsCMAP.V)]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:ncol(TotalFlowsCMAP.V)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
 ```
 
 
@@ -382,7 +423,7 @@ datatable(TotalFlowsCMAP.TM,container=sketchCMAP,rownames=FALSE,extensions = 'Fi
                             bInfo = FALSE,
                             columnDefs = list(list(width = '20%')),
                             searching=FALSE,
-                            paging=FALSE)) %>% formatCurrency(2:18,currency="",digits=0) %>% formatStyle(columns=2:18,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:18]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:18])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+                            paging=FALSE)) %>% formatCurrency(2:ncol(TotalFlowsCMAP.TM),currency="",digits=0) %>% formatStyle(columns=2:ncol(TotalFlowsCMAP.TM),backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,2:ncol(TotalFlowsCMAP.TM)]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,2:ncol(TotalFlowsCMAP.TM)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")# %>% formatStyle(columns=5:10,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,5:10]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,5:10])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=11:16,backgroundColor=styleInterval(sort(unlist(TotalFlowsCMAP.T[,11:16]))[-1],createCSSColors(sort(unlist(TotalFlowsCMAP.T[,11:16])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
 ```
 
 
@@ -455,70 +496,70 @@ sketchDomesticCMAPCommodity <- with(tags,table(
     thead(
         tr(
             th(colspan=1,rowspan=3,"SCTG"),
-            th(colspan= countMode[Mode.Domestic=="Truck",.N],"Truck"),
-            th(colspan= countMode[Mode.Domestic=="Rail",.N],"Rail"),
-            th(colspan= countMode[Mode.Domestic=="Water",.N],"Water"),
-            th(colspan= countMode[Mode.Domestic=="Air",.N],"Air"),
-            th(colspan= countMode[Mode.Domestic=="Multiple",.N],"Multiple"),
-            th(colspan= countMode[Mode.Domestic=="Pipeline",.N],"Pipeline")
+            if ((value <- countMode[Mode.Domestic=="Truck",.N]) > 0) th(colspan = value,"Truck"),
+            if ((value <- countMode[Mode.Domestic=="Rail",.N]) > 0) th(colspan= value,"Rail"),
+            if ((value <- countMode[Mode.Domestic=="Water",.N]) > 0) th(colspan= value,"Water"),
+            if ((value <- countMode[Mode.Domestic=="Air",.N]) > 0) th(colspan= value,"Air"),
+            if ((value <- countMode[Mode.Domestic=="Multiple",.N]) > 0) th(colspan= value,"Multiple"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline",.N]) > 0) th(colspan= value,"Pipeline")
           ),
         tr(
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="In",.N],"In"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Out",.N],"Out"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within",.N],"Within"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="In",.N],"In"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Out",.N],"Out"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within",.N],"Within"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="In",.N],"In"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Out",.N],"Out"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within",.N],"Within"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="In",.N],"In"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Out",.N],"Out"),
-            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within",.N],"Within"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="In",.N],"In"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Out",.N],"Out"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within",.N],"Within"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="In",.N],"In"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out",.N],"Out"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within",.N],"Within")
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="In",.N]) > 0) th(colspan=value,"In"),
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Out",.N]) > 0) th(colspan=value,"Out"),
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Within",.N]) > 0) th(colspan=value,"Within"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="In",.N]) > 0) th(colspan=value,"In"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Out",.N]) > 0) th(colspan=value,"Out"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Within",.N]) > 0) th(colspan=value,"Within"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="In",.N]) > 0) th(colspan=value,"In"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Out",.N]) > 0) th(colspan=value,"Out"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Within",.N]) > 0) th(colspan=value,"Within"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="In",.N]) > 0)th(colspan=value,"In"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Out",.N]) > 0)th(colspan=value,"Out"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Within",.N]) > 0)th(colspan=value,"Within"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="In",.N]) > 0) th(colspan=value,"In"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Out",.N]) > 0) th(colspan=value,"Out"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Within",.N]) > 0) th(colspan=value,"Within"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="In",.N]) > 0) th(colspan=value,"In"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out",.N]) > 0) th(colspan=value,"Out"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within",.N]) > 0) th(colspan=value,"Within")
         ),
         tr(
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="In"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Out"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="In"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Out"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="In"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Out"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="In"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Out"&Table=="Model",.N],"Model"),
-            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="In"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Out"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="In"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="In"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within"&Table=="FAF 2012",.N],"FAF 2012")
-            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within"&Table=="Model",.N],"Model")
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="In"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="In"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Out"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Out"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Within"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Within"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="In"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="In"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Out"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Out"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Within"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Within"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="In"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="In"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Out"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Out"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Within"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Within"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="In"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="In"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Out"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Out"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Within"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Within"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="In"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="In"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Out"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Out"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Within"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Within"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="In"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="In"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Out"&Table=="Model",.N]) > 0) th(colspan=value,"Model"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within"&Table=="FAF 2012",.N]) > 0) th(colspan=value,"FAF 2012"),
+            if ((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within"&Table=="Model",.N]) > 0) th(colspan=value,"Model")
         )
         )))
 
@@ -982,46 +1023,59 @@ TotalFlowsNational.V <- merge(merge(DomesticFlows.V,ImpExpDomesticFlows.V,by="Mo
 TotalFlowsNational.TM <- merge(merge(DomesticFlows.TM,ImpExpDomesticFlows.TM,by="Mode.Domestic"),ImpExpInternationalFlows.TM,by.x="Mode.Domestic",by.y="Mode.Foreign")
 
 
-sketchNational <- with(tags,table(
+countDomestic <- DomesticFlows[,.N,by=.(Move.Type,Table)]
+countInternationalDomestic <- ImpExpDomesticFlows[,.N,by=.(Move.Type,Trade.Type,Table)]
+countInternationalInternational <- ImpExpInternationalFlows[,.N,by=.(Move.Type,Trade.Type,Table)]
+
+sketchCMAP <- with(tags,table(
     thead(
         tr(
             th(colspan=1,rowspan=4,"Mode"),
-            th(colspan=4,rowspan=2, "Domesitc"),
-            th(colspan=4, "Domestic"),
-            th(colspan=4, "International")
+            th(colspan=countDomestic[,.N],rowspan=2, "Domesitc"),
+            th(colspan=countInternationalDomestic[,.N], "Domestic"),
+            th(colspan=countInternationalInternational[,.N], "International")
           ),
         tr(
-            th(colspan=2, "Import"),
-            th(colspan=2, "Export"),
-            th(colspan=2, "Import"),
-            th(colspan=2, "Export")
+            th(colspan=countInternationalDomestic[Trade.Type=="Import",.N], "Import"),
+            th(colspan=countInternationalDomestic[Trade.Type=="Export",.N], "Export"),
+            th(colspan=countInternationalInternational[Trade.Type=="Import",.N], "Import"),
+            th(colspan=countInternationalInternational[Trade.Type=="Export",.N], "Export")
         ),
         tr(
-            lapply(c("Within Zones","Between Zones"),th,colspan=2),
-            lapply(rep(c("Within Zones","Between Zones"),4),th)
+            if((value <- countDomestic[Move.Type=="Within Zones",.N])>0) th(colspan=value, "Within Zones"),
+            if((value <- countDomestic[Move.Type=="Between Zones",.N])>0) th(colspan=value, "Between Zones"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Within Zones",.N])>0) th(colspan=value, "Within Zones"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Between Zones",.N])>0) th(colspan=value, "Between Zones"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Within Zones",.N])>0) th(colspan=value, "Within Zones"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Between Zones",.N])>0) th(colspan=value, "Between Zones"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Within Zones",.N])>0) th(colspan=value, "Within Zones"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Between Zones",.N])>0) th(colspan=value, "Between Zones"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Within Zones",.N])>0) th(colspan=value, "Within Zones"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Between Zones",.N])>0) th(colspan=value, "Between Zones")
         ),
         tr(
-            lapply(rep(c("FAF 2012","Model"),2),th),
-            lapply(rep("FAF 2012",8),th)
+          if((value <- countDomestic[Move.Type=="Within Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countDomestic[Move.Type=="Within Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countDomestic[Move.Type=="Between Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countDomestic[Move.Type=="Between Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Within Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Within Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Between Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Import" & Move.Type=="Between Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Within Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Within Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Between Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalDomestic[Trade.Type=="Export" & Move.Type=="Between Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+          if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Within Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Within Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Between Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Import" & Move.Type=="Between Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Within Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Within Zones" & Table=="Model",.N])>0) th(colspan=value, "Model"),
+            if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Between Zones" & Table=="FAF 2012",.N])>0) th(colspan=value, "FAF 2012"),
+          if((value <- countInternationalInternational[Trade.Type=="Export" & Move.Type=="Between Zones" & Table=="Model",.N])>0) th(colspan=value, "Model")
         )
         )))
-
-# formattedTable <- formattable(TotalFlowsNational,list(
-#   Mode.Domestic=formatter("span",style=~style(font.weight="bold")),
-#   area(col = c(In,Out,Within))~color_tile("white",rsgcolordf[1,5]),
-#   area(col = c(Import_In.x,Import_Out.x,Import_Within.x))~color_tile("white",rsgcolordf[1,5]),
-#   area(col = c(Export_In.x,Export_Out.x,Export_Within.x))~color_tile("white",rsgcolordf[1,5]),
-#   area(col = c(Import_In.y,Import_Out.y,Import_Within.y))~color_tile("white",rsgcolordf[1,5]),
-#   area(col = c(Export_In.y,Export_Out.y,Export_Within.y))~color_tile("white",rsgcolordf[1,5])
-# ))
-
-# as.datatable(formattedTable,container=sketchCMAP,rownames=FALSE,
-#              options = list(sDom  = '<"top">lrt<"bottom">ip',
-#                             autowidth = TRUE,
-#                             bPaginate = FALSE,
-#                             bFilter = FALSE,
-#                             columnDefs = list(list(width = '10%'))),
-#              caption = "CMAP Flow (Tonnage)")%>% formatRound(2:16,0)
 
 datatable(TotalFlowsNational.T,container=sketchNational,rownames=FALSE,extensions = 'FixedColumns',
              options = list(sDom  = '<"top">lrt<"bottom">ip',
@@ -1032,7 +1086,7 @@ datatable(TotalFlowsNational.T,container=sketchNational,rownames=FALSE,extension
                             bInfo = FALSE,
                             columnDefs = list(list(width = '20%')),
                             searching=FALSE,
-                            paging=FALSE)) %>% formatCurrency(2:13,currency="",digits=0) %>% formatStyle(columns=2:13,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,2:13]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,2:13])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+                            paging=FALSE)) %>% formatCurrency(2:ncol(TotalFlowsNational.T),currency="",digits=0) %>% formatStyle(columns=2:ncol(TotalFlowsNational.T),backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,2:ncol(TotalFlowsNational.T)]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,2:ncol(TotalFlowsNational.T)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.T[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.T[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
 
 
 
@@ -1051,7 +1105,7 @@ datatable(TotalFlowsNational.V,container=sketchNational,rownames=FALSE,extension
                             bInfo = FALSE,
                             columnDefs = list(list(width = '20%')),
                             searching=FALSE,
-                            paging=FALSE)) %>% formatCurrency(2:13,digits=0) %>% formatStyle(columns=2:13,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,2:13]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,2:13])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+                            paging=FALSE)) %>% formatCurrency(2:ncol(TotalFlowsNational.V),digits=0) %>% formatStyle(columns=2:ncol(TotalFlowsNational.V),backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,2:ncol(TotalFlowsNational.V)]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,2:ncol(TotalFlowsNational.V)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.V[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.V[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
 ```
 
 
@@ -1067,7 +1121,7 @@ datatable(TotalFlowsNational.TM,container=sketchNational,rownames=FALSE,extensio
                             bInfo = FALSE,
                             columnDefs = list(list(width = '20%')),
                             searching=FALSE,
-                            paging=FALSE)) %>% formatCurrency(2:13,currency="",digits=0) %>% formatStyle(columns=2:13,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,2:13]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,2:13])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
+                            paging=FALSE)) %>% formatCurrency(2:ncol(TotalFlowsNational.TM),currency="",digits=0) %>% formatStyle(columns=2:ncol(TotalFlowsNational.TM),backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,2:ncol(TotalFlowsNational.TM)]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,2:ncol(TotalFlowsNational.TM)])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") #%>% formatStyle(columns=4:7,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,4:7]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,4:7])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center") %>% formatStyle(columns=8:11,backgroundColor=styleInterval(sort(unlist(TotalFlowsNational.TM[,8:11]))[-1],createCSSColors(sort(unlist(TotalFlowsNational.TM[,8:11])),"white","orange")),backgroundSize="90% 80%",backgroundRepeat="no-repeat",backgroundPosition="center")
 ```
 
 
@@ -1144,66 +1198,66 @@ sketchDomesticCommodity <- with(tags,table(
     thead(
         tr(
             th(colspan=1,rowspan=3,"SCTG"),
-            th(colspan= countMode[Mode.Domestic=="Truck",.N],"Truck"),
-            th(colspan= countMode[Mode.Domestic=="Rail",.N],"Rail"),
-            th(colspan= countMode[Mode.Domestic=="Water",.N],"Water"),
-            th(colspan= countMode[Mode.Domestic=="Air",.N],"Air"),
-            th(colspan= countMode[Mode.Domestic=="Multiple",.N],"Multiple"),
-            th(colspan= countMode[Mode.Domestic=="Pipeline",.N],"Pipeline"),
-            th(colspan= countMode[Mode.Domestic=="Other",.N],"Other")
-            # th(colspan= countMode[Mode.Domestic=="None",.N],"None")
+            if((value <- countMode[Mode.Domestic=="Truck",.N])>0) th(colspan=value ,"Truck"),
+            if((value <- countMode[Mode.Domestic=="Rail",.N])>0)th(colspan=value ,"Rail"),
+            if((value <- countMode[Mode.Domestic=="Water",.N])>0)th(colspan=value ,"Water"),
+            if((value <- countMode[Mode.Domestic=="Air",.N])>0)th(colspan= value,"Air"),
+            if((value <- countMode[Mode.Domestic=="Multiple",.N])>0)th(colspan= value,"Multiple"),
+            if((value <- countMode[Mode.Domestic=="Pipeline",.N])>0)th(colspan= value,"Pipeline"),
+            if((value <- countMode[Mode.Domestic=="Other",.N])>0)th(colspan=value ,"Other"),
+            if((value <- countMode[Mode.Domestic=="None",.N])>0)th(colspan=value ,"None")
           ),
         tr(
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones",.N],"Within Zones"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones",.N],"Between Zones"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones",.N],"Within Zones"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones",.N],"Between Zones"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones",.N],"Within Zones"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones",.N],"Between Zones"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones",.N],"Within Zones"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones",.N],"Between Zones"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones",.N],"Within Zones"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones",.N],"Between Zones"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones",.N],"Within Zones"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones",.N],"Between Zones"),
-            th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones",.N],"Within Zones")
-            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones",.N],"Between Zones"),
-            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Within Zones",.N],"Within Zones"),
-            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Between Zones",.N],"Between Zones")
+            if((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones",.N])>0)th(colspan=value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones",.N])>0)th(colspan=value,"Between Zones"),
+            if((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones",.N])>0)th(colspan=value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones",.N])>0)th(colspan=value,"Between Zones"),
+            if((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones",.N])>0)th(colspan=value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones",.N])>0)th(colspan=value,"Between Zones"),
+            if((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones",.N])>0)th(colspan=value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones",.N])>0)th(colspan=value,"Between Zones"),
+            if((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones",.N])>0)th(colspan = value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones",.N])>0)th(colspan = value,"Between Zones"),
+            if((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones",.N])>0)th(colspan = value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones",.N])>0)th(colspan = value,"Between Zones"),
+            if((value <- countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones",.N])>0)th(colspan = value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones",.N])>0)th(colspan = value,"Between Zones"),
+            if((value <- countMode[Mode.Domestic=="None"&Move.Type=="Within Zones",.N])>0)th(colspan = value,"Within Zones"),
+            if((value <- countMode[Mode.Domestic=="None"&Move.Type=="Between Zones",.N])>0)th(colspan = value,"Between Zones")
         ),
         tr(
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            th(colspan=countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
-            th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012")
-            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones"&Table=="Model",.N],"Model"),
-            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Within Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Within Zones"&Table=="Model",.N],"Model"),
-            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Between Zones"&Table=="FAF 2012",.N],"FAF 2012"),
-            # th(colspan=countMode[Mode.Domestic=="None"&Move.Type=="Between Zones"&Table=="Model",.N],"Model")
+            if((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Truck"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Rail"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Water"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Air"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Multiple"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Pipeline"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Other"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="Other"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="None"&Move.Type=="Within Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="None"&Move.Type=="Within Zones"&Table=="Model",.N])>0)th(colspan = value,"Model"),
+            if((value <- countMode[Mode.Domestic=="None"&Move.Type=="Between Zones"&Table=="FAF 2012",.N])>0)th(colspan = value,"FAF 2012"),
+            if((value <- countMode[Mode.Domestic=="None"&Move.Type=="Between Zones"&Table=="Model",.N])>0)th(colspan = value,"Model")
         )
         )))
 
