@@ -180,6 +180,9 @@ calcLogisticsCost <- function(dfspi,s,path){
 ## Heither, revised 11-24-2015: revised to include recycling check file
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [keep NAICS/Commodity_SCTG, return as stand-alone data.table]
 minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_file_path){
+  callIdentifier <- paste0("minLogisticsCostSctgPaths(iSCTG=",iSCTG, ", paths=", paste0(collapse=", ", paths), " naics=", naics, ")")
+  startTime <- Sys.time()
+  print(paste0(startTime, " Entering: ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
     s <- sctg[iSCTG]
     dfsp <- merge(dfsp,cskims[,c("Production_zone","Consumption_zone",paste0("time",paths),paste0("cost",paths)),with=F])
     numrows <- nrow(dfsp)
@@ -211,8 +214,10 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 
   x_write=c(naics,iSCTG,numrows,numrows2,length(paths))
   write(x_write, recycle_check_file_path, ncolumns =length(x_write), append=TRUE)
+  endTime <- Sys.time()
+  print(paste0(startTime, " Exiting after elapsed time ", format(endTime-startTime), ", ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
   return(dfsp)
-}
+} #minLogisticsCostSctgPaths
 
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [return stand-alone data.table]
 minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
