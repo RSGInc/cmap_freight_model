@@ -1,43 +1,31 @@
 html {
-  font-family: Garamond;
   -ms-text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
 }
 body {
 	padding-top: 54px;
-	font-family: Garamond;
-	font-size: 20px
 }
 .section.sidebar {
 	top: 45px;
 	background-color: rgb(107, 174, 214);
-	font-family: Garamond;
 }
 .value-box {
 	color: rgb(255, 255, 255);
-	font-family: Garamond;
 }
 .bg-primary {
 	background-color: rgb(107, 174, 214);
-	font-family: Garamond;
 }
 .navbar-inverse {
 	background-color: rgb(49, 130, 189);
-	font-family: Garamond;
 }
 .dropdown-menu {
 	background-color: rgb(49, 130, 189);
-	font-family: Garamond;
-	font-size: 20px
 }
 .nav-tabs-custom > .nav-tabs > li.active {
 	background-color: rgb(107, 174, 214);
-	font-family: Garamond;
-	font-size: 20px
 }
 .storyboard-nav .sbframelist ul li.active {
 	background-color: rgb(107, 174, 214);
-	font-family: Garamond;
 }
 .navbar-inverse .navbar-nav>.active>a,
 .navbar-inverse .navbar-nav>.active>a:hover,
@@ -45,8 +33,6 @@ body {
 .navbar-inverse .navbar-nav>li>a:hover,
 .navbar-inverse .navbar-nav>li>a:focus {
 	background-color: rgb(8, 81, 156);
-	font-family: Garamond;
-	font-size: 20px
 }
 
 .leaflet-div-icon-cv-service {
