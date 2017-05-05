@@ -162,13 +162,26 @@ calcLogisticsCost <- function(dfspi,s,path){
   if(s$Category=="Finished goods (FG)" & path %in% 39:45) ls <- ls - 0.5*ls*dfspi$lssbd
   
   #Calculate annual transport & logistics cost
+  
+  # NEW EQUATION
+  
   dfspi[,minc:= B0/1000 * runif(length(pounds)) + #changed scale of B0 -- too large for small shipment flows
           B1*pounds/weight + 
           ls*(pounds/2000)*cost + #since cost is per ton
           B2*j*value +
-          B3*time/24*j*value/365 + 
+          B3*time/24*value/365 + 
           (B4 + B5*value/(pounds/2000))*weight/(2*2000) +
-          a*sqrt((LT_OrderTime+time/24)*((sdQ*pounds/2000)^2) + (pounds/2000)^2*(sdLT*LT_OrderTime)^2)]
+          (B5*(value/(pounds/2000))*a)*sqrt((LT_OrderTime+time/24)*((sdQ*pounds/2000)^2) + (pounds/2000)^2*(sdLT*LT_OrderTime)^2)]
+  
+  # OLD EQUATION
+  
+  # dfspi[,minc:= B0/1000 * runif(length(pounds)) + #changed scale of B0 -- too large for small shipment flows
+  #         B1*pounds/weight + 
+  #         ls*(pounds/2000)*cost + #since cost is per ton
+  #         B2*j*value +
+  #         B3*time/24*j*value/365 + 
+  #         (B4 + B5*value/(pounds/2000))*weight/(2*2000) +
+  #         a*sqrt((LT_OrderTime+time/24)*((sdQ*pounds/2000)^2) + (pounds/2000)^2*(sdLT*LT_OrderTime)^2)]
 		  
   return(dfspi$minc)
 }
