@@ -29,10 +29,10 @@ outputprofile     <- FALSE #profiling (set to FALSE for production)
 #Step 1 Firm Synthesis
 #---------------------------------------------------------------------
 
-provalthreshold       <- 0.8     # threshold for percentage of purchase value for each commodity group met by producers
+provalthreshold       <- 0.01     # threshold for percentage of purchase value for each commodity group met by producers
 combinationthreshold  <- 7000000 # max number of combinations of producers and consumers to enter into a procurement market game
 consprodratiolimit    <- 1000000     # limit on ratio of consumers to producers to enter into the procurement market game
-foreignprodcostfactor <- 0.9     # producer cost factor for foreign produers (applied to unit costs) 
+foreignprodcostfactor <- 0.9     # producer cost factor for foreign produers (applied to unit costs)
 wholesalecostfactor    <- 1.2     # markup factor for wholesalers (applied to unit costs)
 
 #---------------------------------------------------------------------
@@ -40,7 +40,7 @@ wholesalecostfactor    <- 1.2     # markup factor for wholesalers (applied to un
 #---------------------------------------------------------------------
 
 #Path parameters: assume the following parameters for all alternatives
-B1                 <- 100            #Constant unit per order 
+B1                 <- 100            #Constant unit per order
 B4                 <- 2000           #Storage costs per unit per year
 j                  <- 0.01           #Fraction of shipment that is lost/damaged
 LT_OrderTime       <- 10             #Expected lead time for order fulfillment (to be added to in-transit time)
@@ -96,15 +96,21 @@ HighVariability     <- 0.09
 #---------------------------------------------------------------------
 
 # max number of R script instances to run at once for determining Supplier to Buyer costs (1 for monitoring if that is run)
-maxcostrscripts <- 8
+maxcostrscripts <- min(5, max(1, future::availableCores()-1))
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
 #maxrscriptinstances <- 32
-maxrscriptinstances <- 8
+maxrscriptinstances <- maxcostrscripts
+
 
 # should monitoring be run?
 pmgmonitoring <- TRUE
 
+pmgnaicstorun <- c(
+  326220, 212230,336414, 332420
+  #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330
+  ,113000, 211000,212100
+)
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
 # pmgmonto <- c("cheither@cmap.illinois.gov","lcruise@cmap.illinois.gov")
@@ -127,7 +133,7 @@ IMax <- 6
 # want lots of detail about tradebots?
 Verbose <- 0
 
-# recalculate alternate payoffs every iteration based on updated expected payoffs 
+# recalculate alternate payoffs every iteration based on updated expected payoffs
 DynamicAlternatePayoffs <- 1
 
 # should initial expected tradeoffs know size of other traders?
@@ -136,7 +142,7 @@ ClairvoyantInitialExpectedPayoffs <- 0
 # should sellers accept offers based on order size instead of expected payoff?
 SellersRankOffersByOrderSize <- 0
 
-# multiplier to goose initial expected tradeoff to encourage experimentation with other traders 
+# multiplier to goose initial expected tradeoff to encourage experimentation with other traders
 InitExpPayoff <- 1.1
 Temptation    <- 0.6
 BothCoop      <- 1.0
