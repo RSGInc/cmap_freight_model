@@ -50,10 +50,6 @@ if (exitStatus != 0) {
 ### --------------------------------
 progressNextStep("Running PMGs")
 
-load(file.path(model$outputdir, "naics_set.Rdata"))
-naics_set <-
-  subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
-
 #Call the writePMGini function to write out the variables above to the PMG ini file at run time
 writePMGini(model$scenvars, "./PMG/PMG.ini")
 

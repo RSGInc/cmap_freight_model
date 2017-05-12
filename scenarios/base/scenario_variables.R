@@ -106,11 +106,35 @@ maxrscriptinstances <- maxcostrscripts
 # should monitoring be run?
 pmgmonitoring <- TRUE
 
-pmgnaicstorun <- c(
-  326220, 212230,336414, 332420
-  #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330
-  ,113000, 211000,212100
-)
+getPMGNaicsToRun <- function() {
+  load(file.path(outputdir, "naics_set.Rdata"))
+  pmgnaicstorun <- c(
+    326220, 212230,336414, 332420
+    #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330
+    #,113000, 211000,212100
+  )
+
+  if (length(pmgnaicstorun) == 0) {
+    returnValue <- naics_set
+  } else {
+    returnValue <- pmgnaicstorun
+    returnValue <-
+      subset(naics_set, NAICS %in% pmgnaicstorun)
+    if (nrow(returnValue) != length(pmgnaicstorun)) {
+      stop(
+        paste(
+          "Some of pmgnaicstorun were not found in the naics_set Number requested=",
+          length(pmgnaicstorun),
+          ", number found=",
+          nrow(returnValue)
+        )
+      )
+    }
+  }# end if using only a subset
+
+  return(returnValue)
+} #end getPMGNaicsToRun
+
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
 # pmgmonto <- c("cheither@cmap.illinois.gov","lcruise@cmap.illinois.gov")

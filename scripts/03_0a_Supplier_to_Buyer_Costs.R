@@ -41,26 +41,12 @@ plan(multiprocess,
 #list to hold the group outputs for any currently running naics
 naicsInProcess <- list()
 
-load(file.path(outputdir, "naics_set.Rdata"))
-naics_set <-
-  subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
+naics_to_run <- getPMGNaicsToRun()
 
-if (nrow(naics_set) != length(model$scenvars$pmgnaicstorun)) {
-  stop(
-    paste(
-      "Some of model$scenvars$pmgnaicstorun were not found in the naics_set. Number requested=",
-      length(model$scenvars$pmgnaicstorun),
-      ", number found=",
-      nrow(naics_set)
-    )
-  )
-}
-
-
-for (naics_run_number in 1:nrow(naics_set)) {
-  naics <- naics_set$NAICS[naics_run_number]
-  groups <- naics_set$groups[naics_run_number]
-  sprod <- ifelse(naics_set$Split_Prod[naics_run_number], 1, 0)
+for (naics_run_number in 1:nrow(naics_to_run)) {
+  naics <- naics_to_run$NAICS[naics_run_number]
+  groups <- naics_to_run$groups[naics_run_number]
+  sprod <- ifelse(naics_to_run$Split_Prod[naics_run_number], 1, 0)
 
   log_file_path <-
     file.path(outputdir, paste0(naics, "_PMGSetup_Log.txt"))
@@ -253,7 +239,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
       maximumTasksToResolve = 1
     )
   } #end loop over groups
-} #end for (naics_run_number in 1:nrow(naics_set))
+} #end for (naics_run_number in 1:nrow(naics_to_run))
 
 #wait until all tasks are finished
 processRunningTasks(wait = TRUE, debug = TRUE)

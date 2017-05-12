@@ -17,15 +17,11 @@ progressStart(pmgout, 3)
 #-----------------------------------------------------------------------------------
 progressNextStep("Combining PMG Output files")
 
-load(file.path(model$outputdir, "naics_set.Rdata"))
-### -- Heither, 02-24-2017: testing: no 327390
-#naics_set <- subset(naics_set, NAICS %in% c(324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330))
-naics_set <-
-  subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
+naics_to_run <- getPMGNaicsToRun()
 naicspairs <- list() #list to hold the summarized outputs
 
-for (naics_run_number in 1:nrow(naics_set)) {
-  naics <- naics_set$NAICS[naics_run_number]
+for (naics_run_number in 1:nrow(naics_to_run)) {
+  naics <- naics_to_run$NAICS[naics_run_number]
 
   #check if the next naics market is ready
   naicsLogPath <-
@@ -70,7 +66,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
   pairs[, Quantity.Traded := as.character(Quantity.Traded)]
   pairs[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
   naicspairs[[naics_run_number]] <- pairs
-} #end for (naics_run_number in 1:nrow(naics_set))
+} #end for (naics_run_number in 1:nrow(naics_to_run))
 
 pairs <- rbindlist(naicspairs)
 rm(naicspairs)
