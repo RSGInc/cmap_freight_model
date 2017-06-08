@@ -86,7 +86,7 @@ pairs[, AnnualValue := (Last.Iteration.Quantity / PurchaseAmountTons) *
 setkey(pairs, Production_zone, Consumption_zone, MinPath)
 bad1 <-
   merge(pairs,
-        ineligible,
+        ineligible[,MinPath:=as.numeric(MinPath)],
         by = c("Production_zone", "Consumption_zone", "MinPath"))
 model$bad_modes <- file.path(model$outputdir, "bad_modes.csv")
 if (file.exists(model$bad_modes))  {

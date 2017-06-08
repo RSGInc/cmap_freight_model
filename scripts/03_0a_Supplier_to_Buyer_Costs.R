@@ -45,7 +45,7 @@ load(file.path(outputdir, "naics_set.Rdata"))
 naics_set <-
   subset(naics_set, NAICS %in% model$scenvars$pmgnaicstorun)
 
-if (nrow(naics_set) != length(model$scenvars$pmgnaicstorun)) {
+if (nrow(naics_set) != length(unique(model$scenvars$pmgnaicstorun))) {
   stop(
     paste(
       "Some of model$scenvars$pmgnaicstorun were not found in the naics_set. Number requested=",

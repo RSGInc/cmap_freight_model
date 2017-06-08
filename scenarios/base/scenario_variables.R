@@ -29,7 +29,7 @@ outputprofile     <- FALSE #profiling (set to FALSE for production)
 #Step 1 Firm Synthesis
 #---------------------------------------------------------------------
 
-provalthreshold       <- 0.01     # threshold for percentage of purchase value for each commodity group met by producers
+provalthreshold       <- 0.8     # threshold for percentage of purchase value for each commodity group met by producers
 combinationthreshold  <- 7000000 # max number of combinations of producers and consumers to enter into a procurement market game
 consprodratiolimit    <- 1000000     # limit on ratio of consumers to producers to enter into the procurement market game
 foreignprodcostfactor <- 0.9     # producer cost factor for foreign produers (applied to unit costs)
@@ -91,25 +91,32 @@ LowVariability      <- 0.03
 MediumVariability   <- 0.06
 HighVariability     <- 0.09
 
+# Supplier Sampling variables
+distBased <- FALSE #Whether to use distance based distribution or distance-ton based distribution
+nSuppliersPerBuyer <- 20
+distance_bins <- seq(0,150000,100)
+
+
 #---------------------------------------------------------------------
 #Step 3 Run PMG
 #---------------------------------------------------------------------
 
 # max number of R script instances to run at once for determining Supplier to Buyer costs (1 for monitoring if that is run)
-maxcostrscripts <- min(5, max(1, future::availableCores()-1))
+maxcostrscripts <- min(8, max(1, future::availableCores()-1))
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
 #maxrscriptinstances <- 32
 maxrscriptinstances <- maxcostrscripts
 
-
 # should monitoring be run?
 pmgmonitoring <- TRUE
 
 pmgnaicstorun <- c(
-  326220, 212230,336414, 332420
-  #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330
-  ,113000, 211000,212100
+  #326220, 212230,336414, 332420,
+  #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330,
+  #113000, 211000,212100,
+  #"2123A0","312200"
+  327390, 327100, 327200, 324190, 211000, 324110#, 327310, 327992, 339910
 )
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
@@ -122,16 +129,16 @@ pmgmonsmtp <- "WRJHUBVPW01.i-rsg.com"
 pmgmoninterval <- 14400
 
 # should pmg logging be on? (see also verbose below for level of detail)
-pmglogging <- TRUE
+pmglogging <- FALSE
 
 # random starting seed for the PMGs
 RandomSeed <- 41
 
 # number of iterations
-IMax <- 6
+IMax <- 6 # Default was 6
 
 # want lots of detail about tradebots?
-Verbose <- 0
+Verbose <- 0 # 0:FALSE	1:TRUE
 
 # recalculate alternate payoffs every iteration based on updated expected payoffs
 DynamicAlternatePayoffs <- 1
@@ -181,3 +188,8 @@ wgtmax_semi <- 100000
 #Step 11 Prepare trip table
 #---------------------------------------------------------------------
 annualfactor        <- 310  #sampling factor to convert annual truck flows to daily
+
+#---------------------------------------------------------------------
+#Step NA Run Sensitivity analysis
+#---------------------------------------------------------------------
+runSensitivityAnalysis <- FALSE

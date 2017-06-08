@@ -256,12 +256,14 @@ rm(for_prod)
 
 # Prepare for Writing out a producers file for each NAICS, with each firm represented by:
 # SellerID (BusID)  Zone (MESOZONE)	NAICS (NAICS6_Make)	Size (Emp)	OutputCommodity (SCTG_Make)	OutputCapacityTons (ProdCap)	NonTransportUnitCost (UnitCost)
-producers[,c("FAFZONE","CBPZONE","esizecat","ProdVal","ValEmp"):=NULL]
+# producers[,c("FAFZONE","CBPZONE","esizecat","ProdVal","ValEmp"):=NULL] # Don't remove FAFzone here
+producers[,c("CBPZONE","esizecat","ProdVal","ValEmp"):=NULL] # Don't remove FAFzone here
 setnames(producers,c("BusID","MESOZONE","Industry_NAICS6_Make","Emp","ProdCap","UnitCost"),c("SellerID","Zone","NAICS","Size","OutputCapacityTons","NonTransportUnitCost"))
 producers[,OutputCommodity:=NAICS]
 
 #Add in wholesalers to producers
-wholesalers[,c("FAFZONE","CBPZONE","esizecat","ProdVal","ValEmp"):=NULL]
+# wholesalers[,c("FAFZONE","CBPZONE","esizecat","ProdVal","ValEmp"):=NULL] # Don't remove the FAFzones here
+wholesalers[,c("CBPZONE","esizecat","ProdVal","ValEmp"):=NULL]
 setnames(wholesalers,c("BusID","MESOZONE","Industry_NAICS6_Make","Emp","ProdCap","UnitCost"),c("SellerID","Zone","NAICS","Size","OutputCapacityTons","NonTransportUnitCost"))
 #simulate the single specific NAICS commodity that the wholesaler deals in to simplify
 #(wholesale NAICS are one to many NAICS commodities)
@@ -304,7 +306,7 @@ rm(emp)
 io[,ValEmp:=ProVal/Emp]
 
 #Merge top k% suppliers with establishment list to create a consumers\buyers dataset
-consumers <- merge(io[,list(Industry_NAICS6_Use,Industry_NAICS6_Make,ValEmp)], cbp[,list(MESOZONE,Industry_NAICS6_Use,Commodity_SCTG,BusID,Emp)], "Industry_NAICS6_Use", allow.cartesian = TRUE)
+consumers <- merge(io[,list(Industry_NAICS6_Use,Industry_NAICS6_Make,ValEmp)], cbp[,list(FAFZONE,MESOZONE,Industry_NAICS6_Use,Commodity_SCTG,BusID,Emp)], "Industry_NAICS6_Use", allow.cartesian = TRUE)
 setnames(consumers,"Commodity_SCTG","Buyer.SCTG")
 consumers <- merge(c_n6_n6io_sctg[!duplicated(Industry_NAICS6_Make),list(Industry_NAICS6_Make, Commodity_SCTG)], consumers,"Industry_NAICS6_Make") #merge in the first matching SCTG code
 
@@ -366,7 +368,8 @@ for_cons[,MESOZONE:= CBPZONE + 150L]
 for_cons[,BusID:= max(producers$SellerID) + .I] #add foreign consumers on after the foreign producers
 for_cons[,Buyer.SCTG:=0L] #don't know buyer industry
 for_cons[,Emp:=0L] #don't know employment of buying firm
-for_cons[,c("CBPZONE","FAFZONE","ProdVal","ProVal","PctProVal", "UnitCost"):= NULL] # Remove extra fields
+# for_cons[,c("CBPZONE","FAFZONE","ProdVal","ProVal","PctProVal", "UnitCost"):= NULL] # Remove extra fields
+for_cons[,c("CBPZONE","ProdVal","ProVal","PctProVal", "UnitCost"):= NULL]
 consumers <- rbind(consumers,for_cons,use.names=TRUE)
 
 # Add preference weights
@@ -486,18 +489,20 @@ calcSampleGroups <- function(ncons,nprod,cthresh,sprod,cprl){
   ngroups <- 1L
   nconst <- as.numeric(ncons)
   nprodt <- as.numeric(nprod)
+  nSuppliersPerBuyer <- model$scenvars$nSuppliersPerBuyer
+  cthresh <- cthresh*0.5
   if(sprod){
-    while (nconst * nprodt > cthresh) {
+    while (nconst * nSuppliersPerBuyer > cthresh) {
       ngroups <- ngroups + 1L
       nconst <- as.numeric(ceiling(as.numeric(ncons) / ngroups))
       nprodt <- as.numeric(ceiling(as.numeric(nprod) / ngroups))
     }
   } else {
-    while ((nconst * nprodt > cthresh) | (nconst/nprodt > cprl)) {
+    while ((nconst * nSuppliersPerBuyer > cthresh) | (nconst/nprodt > cprl)) {
       ngroups <- ngroups + 1L
       nconst <- as.numeric(ceiling(as.numeric(ncons) / ngroups))
     }
-  }  
+  }
   return(c(nprodt,nconst,nconst * nprodt,nconst/nprodt, ngroups))
 }
 
@@ -520,6 +525,8 @@ for (naics in naics_set$NAICS) {
   #write the tables to an R data file
   save(consc,prodc, file = file.path(model$outputdir,paste0(naics, ".Rdata")))
 }
+
+# save(consumers, producers, file = file.path(model$outputdir,"producers_consumers.Rdata"))
 
 rm(naics, consc, prodc)
 
