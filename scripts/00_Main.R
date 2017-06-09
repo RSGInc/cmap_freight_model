@@ -173,6 +173,7 @@ if(!model$scenvars$runSensitivityAnalysis) {
   )
 
 } else {
+
   # First change the functions from rFreight package
   loadInputs2 <- function(filelist, inputdir) {
     if (length(filelist) > 0) {
