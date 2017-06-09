@@ -69,11 +69,14 @@ for (naics_run_number in 1:nrow(naics_set)) {
   #apply fix for bit64/data.table handling of large integers in rbindlist
   pairs[, Quantity.Traded := as.character(Quantity.Traded)]
   pairs[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
+  #Temporary addition. Think of a permanent fix
+  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "lssbd", "Seller.Size", "Buyer.Size") := NULL]
   naicspairs[[naics_run_number]] <- pairs
 } #end for (naics_run_number in 1:nrow(naics_set))
 
 pairs <- rbindlist(naicspairs)
 rm(naicspairs)
+gc()
 #apply fix for bit64/data.table handling of large integers in rbindlist
 pairs[, Quantity.Traded := as.integer64.character(Quantity.Traded)]
 pairs[, Last.Iteration.Quantity := as.integer64.character(Last.Iteration.Quantity)]
