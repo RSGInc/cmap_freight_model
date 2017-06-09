@@ -40,6 +40,11 @@ consprodratiolimit    <- 1000000     # limit on ratio of consumers to producers 
 foreignprodcostfactor <- 0.9     # producer cost factor for foreign produers (applied to unit costs)
 wholesalecostfactor    <- 1.2     # markup factor for wholesalers (applied to unit costs)
 
+# Supplier Sampling variables
+distBased <- FALSE #Whether to use distance based distribution or distance-ton based distribution
+nSuppliersPerBuyer <- 20
+distance_bins <- seq(0,150000,100)
+
 #---------------------------------------------------------------------
 #Step 2 Mode-Path Paramaters
 #---------------------------------------------------------------------
@@ -83,7 +88,6 @@ CAP1FTL           <- 30*2000        #Capacity of 1 Full Truckload = 30 tons
 CAP1Carload       <- 100000	        #Capacity of 1 Full Railcar = 85 tons (85*2000); Heither, 10-05-2016: test 100000 lbs so mode is actually used
 CAP1Airplane      <- 25*2000        #Capacity of 1 Airplane Cargo Hold = 25 ton
 
-
 #Allow "a" to vary by type of commodity (Functional vs. Innovative)
 #Assume "a" is the same for goods inside three different groups
 LowMultiplier      <- 0.5
@@ -96,12 +100,6 @@ LowVariability      <- 0.03
 MediumVariability   <- 0.06
 HighVariability     <- 0.09
 
-# Supplier Sampling variables
-distBased <- FALSE #Whether to use distance based distribution or distance-ton based distribution
-nSuppliersPerBuyer <- 20
-distance_bins <- seq(0,150000,100)
-
-
 #---------------------------------------------------------------------
 #Step 3 Run PMG
 #---------------------------------------------------------------------
@@ -110,19 +108,26 @@ distance_bins <- seq(0,150000,100)
 maxcostrscripts <- min(8, max(1, future::availableCores()-1))
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
-#maxrscriptinstances <- 32
-maxrscriptinstances <- maxcostrscripts
+maxrscriptinstances <- 16+1
 
 # should monitoring be run?
 pmgmonitoring <- TRUE
 
-pmgnaicstorun <- c(
-  #326220, 212230,336414, 332420,
-  #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330,
-  #113000, 211000,212100,
-  #"2123A0","312200"
-  327390, 327100, 327200, 324190, 211000, 324110#, 327310, 327992, 339910
-)
+# Full NAICS run
+pmgnaicstorun <- c("113000","114000",
+                   "211000","212100","212230","2122A0","212310","2123A0",
+                   "311111","311119","311210","311221","311225","31122A","311300","311410","311420","311513","311514","31151A","311520","311615","31161A","311700","311810","3118A0","311910","311920","311930","311940","311990","312110","312120","312130","312140","312200","313100","313200","313300","314120","314900","315000","316000",
+                   "321100","321200","321910","3219A0","322110","322120","322130","322210","322220","322230","322291","322299","323110","323120","324110","324121","324122","324190","325110","325120","325130","325180","325190","325211","3252A0","325310","325320","325411","325412","325413","325414","325510","325520","325610","325620","325910","3259A0","326110","326120","326130","326140","326150","326160","326190","326210","326220","326290","327100","327200","327310","327320","327330","327390","327400","327910","327991","327992","327993","327999",
+                   "331110","331200","33131A","33131B","331411","331419","331420","331490","331510","331520","332114","33211A","33211B","332200","332310","332320","332410","332420","332430","332500","332600","332710","332720","332800","332913","33291A","332991","332996","33299A","33299B","333111","333112","333120","333130","333220","333295","33329A","333313","333314","333315","33331A","333414","333415","33341A","333511","333514","33351A","33351B","333611","333612","333613","333618","333912","33391A","333920","333993","333994","33399A","33399B","334111","334112","33411A","334210","334220","334290","334300","334413","334418","33441A","334510","334511","334512","334513","334514","334515","334516","334517","33451A","334610","335110","335120","335210","335221","335222","335224","335228","335311","335312","335313","335314","335911","335912","335920","335930","335991","335999","336120","336211","336214","336310","336320","336350","336360","336370","336390","3363A0","336411","336412","336413","336414","33641A","336500","336611","336612","336991","336992","336999","337110","337121","337122","337127","33712A","337215","337900","339112","339113","339114","339116","339910","339920","339930","339940","339950","339990",
+                   "511110","511120","511130","5111A0")
+
+# pmgnaicstorun <- c(
+#   #326220, 212230,336414, 332420,
+#   #324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330,
+#   #113000, 211000,212100,
+#   #"2123A0","312200"
+#   327390, 327100, 327200, 324190, 211000, 324110#, 327310, 327992, 339910
+# )
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
 # pmgmonto <- c("cheither@cmap.illinois.gov","lcruise@cmap.illinois.gov")
@@ -171,10 +176,10 @@ WallflowerPayoff <- 0.0
 BuyersIgnoreSoldOutSellers <- 1
 
 #ratio at which buyers don't try to trade with sold out sellers
-IgnoreSoldOutSellersMinBuyerSellerRatio = 100
+IgnoreSoldOutSellersMinBuyerSellerRatio <- 100
 
 #faster reading of input files but does less checks (ok for use with R)
-RawFastParser = 1
+RawFastParser <- 1
 
 #---------------------------------------------------------------------
 #Step 7 Vehicle Tour Choice Pattern

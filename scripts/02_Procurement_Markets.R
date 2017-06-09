@@ -1,23 +1,16 @@
 ##############################################################################################
 
 #Title:             CMAP Agent Based Freight Forecasting Code
-
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
-
 #Description:       2_Procurement_Markets.R produces the costs inputs to the PMGs and also
-
 #                   writes out the buy and sell inputs from the producers and cosumers tables
-
 #Date:              June 30, 2014
-
 #Author:            Resource Systems Group, Inc.
-
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
 
 ##############################################################################################
 
 # Initialize the variables if note performing sensitivity analysis
-
 if(!exists("B0")) B0 <- 10000
 if(exists("B1")) model$scenvars$B1 <- B1
 if(!exists("B2_mult")) B2_mult <- 1
@@ -27,79 +20,52 @@ if(!exists("B5_mult")) B5_mult <- 1
 
 if(exists("choice")) print(sprintf("Design %d:\n B0: %d, B1: %d, B2: %1.2f, B3: %1.2f, B4: %d, B5: %1.2f\n",get("choice",envir = .GlobalEnv), B0, model$scenvars$B1, B2_mult, B3_mult, model$scenvars$B4, B5_mult))
 
-
-
-
 #-----------------------------------------------------------------------------------
-
 #Step 2 Procurement Markets
-
 #-----------------------------------------------------------------------------------
 
 progressStart(pmg,3)
 
-
-
 #------------------------------------------------------------------------------------------------------
-
 # Process skims and create inputs and functions for applying models
-
 #------------------------------------------------------------------------------------------------------
 
 progressNextStep("Processing skims")
 
-
-
 #Distribution Channel Model: develop correspondences
-
-distchan_calcats <- data.table(CHOICE=c("0","1","2+","2+"),CHID=1:4) #correspondence between choice model alts and target categories int he distchan model
+#---------------------------------------------------
+#correspondence between choice model alts and target categories in the distchan model
+distchan_calcats <- data.table(CHOICE=c("0","1","2+","2+"),CHID=1:4)
 
 #add the FAMESCTG category to pairs for comparison with calibration targets
-
 famesctg <- c(rep("A",3),rep("E",4),rep("K",2),rep("F",3),rep("C",7),rep("B",5),rep("J",6),"C",rep("G",3),"D",rep("I",2),"G","J",rep("H",4))
 
 setnames(distchan_cal, c("CATEGORY", "CHOICE", "TARGET"))
 
 #process gcd skims
-
 setkey(mesozone_gcd, Production_zone, Consumption_zone)
+mesozone_gcd[,c("Production_lon", "Production_lat", "Consumption_lon", "Consumption_lat"):=NULL]
 
-mesozone_gcd[,c("Production_lon", "Production_lat", "Consumption_lon", "Consumption_lat"):=NULL]# Drop unneeded fields
+#Mode Choice -- Shipment size model
+#----------------------------------
 
-
-#Shipment size model: create tabke of sizes
-
+#Shipment sizes: create table of sizes
 ShipSize <- data.table(Ship_size = 1:4, weight = c(1000L, 10000L, 30000L, 150000L), k = 1)
 
- 
-
-## ---------------------------------------------------------------
-
-## Heither, revised 09-25-2015: CMAP pre-processing procedures create time & cost fields for all 54 mode paths for
-
-##                              ALL Domestic and Foreign combinations.  RSG shortcut code is now turned off.
-
-
-
-#### -- OBSOLETE: CMAP only skims, time and cost fields for 54 paths
-
+#Mode-Path Skims:
 setnames(skims, c("Origin", "Destination"), c("Production_zone", "Consumption_zone"))
 
-#### -- setkey(skims, Production_zone, Consumption_zone)
-
-if(!identical(nModes <- sum(grepl("time",colnames(skims))),nCost <- sum(grepl("cost",colnames(skims))))) stop(paste0("Information of time and cost available on ", min(nCost,nModes),"/",max(nCost,nModes)))
+#check if the number of time and costs fields is the same
+if(!identical(nModes <- sum(grepl("time",colnames(skims))),
+              nCost <- sum(grepl("cost",colnames(skims))))) {
+  stop(paste0("Information of time and cost available on ", min(nCost,nModes),"/",max(nCost,nModes)))
+}
 
 cskims <- skims[,c("Production_zone", "Consumption_zone",paste0("time", 1:nModes), paste0("cost", 1:nModes)),with = FALSE]
-
-
 setkey(cskims, Production_zone, Consumption_zone)
-
 rm(skims)
 
-##
-
-## Heither, revised 01-29-2016: create a file of ineligible modes for each zone pair (QC review)
-
+#Create a file of ineligible modes for each zone pair
 mdpaths <- c(1:nModes)
 
 test <- cbind(melt(cskims[,c("Production_zone","Consumption_zone",paste0("time",mdpaths)),with=F], measure.vars=paste0("time",mdpaths), variable.name="timepath",
@@ -114,12 +80,7 @@ ineligible[,InEl:=1]
 
 setkey(ineligible,Production_zone,Consumption_zone,MinPath)
 
-## ---------------------------------------------------------------
-
-
-
 #Prepare SCTG specific input file
-
 setkey(sctg,Commodity_SCTG)
 
 #Assign values for B2,B3,B5,a, and sdQ paramaters in logistics cost equation
@@ -206,7 +167,7 @@ sctg[Category=="Finished goods (FG)",paste0("B0",c(32:45,47:50)) := sctg[Categor
 #Define the logistics cost function used in the mode path model
 
 calcLogisticsCost <- function(dfspi,s,path){
-  
+
   setnames(dfspi,c("pounds","weight","value","lssbd","time","cost"))
 
   ## variables from model$scenvars
@@ -251,11 +212,11 @@ calcLogisticsCost <- function(dfspi,s,path){
 
   #Calculate annual transport & logistics cost
 
-  
+
 
   # NEW EQUATION
 
-  
+
 
   dfspi[,minc:= B0 * runif(length(pounds)) + #changed scale of B0 -- too large for small shipment flows
 
@@ -265,33 +226,33 @@ calcLogisticsCost <- function(dfspi,s,path){
 
           B2*j*value +
 
-          B3*time/24*value/365 + 
+          B3*time/24*value/365 +
 
           (B4 + B5*value/(pounds/2000))*weight/(2*2000) +
 
           (B5*(value/(pounds/2000))*a)*sqrt((LT_OrderTime+time/24)*((sdQ*pounds/2000)^2) + (pounds/2000)^2*(sdLT*LT_OrderTime)^2)]
 
-  
+
 
   # OLD EQUATION
 
-  
+
 
   # dfspi[,minc:= B0/1000 * runif(length(pounds)) + #changed scale of B0 -- too large for small shipment flows
 
-  #         B1*pounds/weight + 
+  #         B1*pounds/weight +
 
   #         ls*(pounds/2000)*cost + #since cost is per ton
 
   #         B2*j*value +
 
-  #         B3*time/24*j*value/365 + 
+  #         B3*time/24*j*value/365 +
 
   #         (B4 + B5*value/(pounds/2000))*weight/(2*2000) +
 
   #         a*sqrt((LT_OrderTime+time/24)*((sdQ*pounds/2000)^2) + (pounds/2000)^2*(sdLT*LT_OrderTime)^2)]
 
-		  
+
 
   return(dfspi$minc)
 
@@ -312,7 +273,7 @@ calcLogisticsCost <- function(dfspi,s,path){
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [keep NAICS/Commodity_SCTG, return as stand-alone data.table]
 
 minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_file_path){
-  
+
 
   callIdentifier <- paste0("minLogisticsCostSctgPaths(iSCTG=",iSCTG, ", paths=", paste0(collapse=", ", paths), " naics=", naics, ")")
 
@@ -340,19 +301,19 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
     }
 
     dfsp <- rbindlist(lapply(paths,transform_merge_data)) # Saves memory with a little compromise on time
-    
+
     #################
     # Group approach
     ################
     # dfsp <- cbind(melt(dfsp[,c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd",paste0("time",paths)),with=F], measure.vars=paste0("time",paths), variable.name="timepath", value.name="time"),
-    # 
+    #
     #               melt(dfsp[,paste0("cost",paths),with=F], measure.vars=paste0("cost",paths), variable.name="costpath", value.name="cost"))
     # suppressWarnings(dfsp[,path:=as.numeric(rep(paths,each=numrows))])
     # print(paste0("Paths: ",paste0(paths,collapse = ",")))
     # print(paste0("Full: ", object.size(dfsp)/(1024**3)," Gb"))
     # dfsp <- dfsp[!(is.na(time)&is.na(cost))]
     # print(paste0("Partial: ", object.size(dfsp)/(1024**3)," Gb"))
-    
+
 
     dfsp[,minc:=calcLogisticsCost(.SD[,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,unique(path)),by=path] # Faster implementation of above code
 
@@ -381,7 +342,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
   dfsp[path %in% 51:52 & weight<(0.75*CAP1FTL),avail:=FALSE] #Eliminate Container-Direct from choice set if Shipment Size < 1 40' Container
 
   dfsp[path %in% 53:54 & weight<CAP1FTL,avail:=FALSE] #Eliminate International Transload-Direct from choice set if Shipment Size < 1 FTL
-  
+
   dfsp[iSCTG %in% c(16:19) & path %in% c(1:54), avail:=FALSE]
 
   dfsp <- dfsp[avail==TRUE & !is.na(minc)]		## limit to only viable choices before finding minimum path
@@ -524,25 +485,25 @@ minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
 #####################
 # create_pmg_sample_groups <- function(naics,groups,sprod){
 #   # sort by sizes
-# 
+#
 #   setkey(consc, Size)
-# 
+#
 #   setkey(prodc, Size)
-# 
+#
 #   prodconsratio <- sum(prodc$OutputCapacityTons)/sum(consc$PurchaseAmountTons)
-# 
+#
 #   if(prodconsratio < 1.1){ #TODO need to move this to variables
-# 
+#
 #     #reduce consumption to ratio is >=1.1
-# 
+#
 #     suppressWarnings(consc[,PurchaseAmountTons:=PurchaseAmountTons/1.1*prodconsratio])
-# 
+#
 #   }
-# 
-# 
+#
+#
 #   #merge together to create all of the pairs of firms for this group and commodity
-# 
-# 
+#
+#
 #   set.seed(151)
 #   suppressWarnings(consc[,group:=1:groups])
 # }
@@ -771,7 +732,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
   print(paste(Sys.time(), "Finished writing buy file for ",naics,"group",g))
 
-  
+
   ###########################
   # Group Approach
   ###########################
@@ -809,7 +770,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     prodcg <- prodc[,list(OutputCommodity,NAICS,Commodity_SCTG,SellerID,Size,FAFZONE,Zone,OutputCapacityTons=OutputCapacityTonsG)]
 
   }
-  
+
   ##############################
   # Full apprach
   ##############################
@@ -899,7 +860,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   }
 
   pc <- rbindlist(lapply(1:n_splits,sample_data))
-  
+
   ############
   # Split group approach
   ###########
@@ -924,7 +885,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   # print(paste0("Number of rows in pairs file: ",pc[,.N]))
   # print(paste0("Size of output of pairs file: ",object.size(pc)/(1024**3)," Gb"))
   # print(paste0("Size per row of pairs file: ",object.size(pc)/as.numeric(pc[,.N])," Gb"))
-  
+
   #fwrite(pc,file = file.path(model$outputdir,paste0(naics, "_g", g, ".sampledpairs.csv")))
 
   # Need to make sure that there is enough capacity to fullfill the demand.
@@ -1048,10 +1009,10 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   ##########################
   ## This part of code is memory intensive
   ###########################
-  
+
   # pc[, k:= 1 ]
   # pc <- merge(pc, ShipSize, by = "k", allow.cartesian = TRUE)
-  # 
+  #
   # # Clean up fields -- remove temps fields from distrubtion channel model
   # pc[, k:= NULL]
 
@@ -1075,13 +1036,13 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #Add "MinGmnql","MinPath","Attribute2_ShipTime" to pc using the minLogisticsCost function
 
   ##Rprof("profile1.out")
-  
+
   size_per_row <- 12010 #bytes
   npct <- as.numeric(pc[,.N])
   nShipSizet <- as.numeric(ShipSize[,.N])
   n_splits <- ceiling(npct*nShipSizet*size_per_row/((ram_to_use*(1024**3))/cores_used))
   suppressWarnings(pc[,':='(n_split=1:n_splits,k=1)])
-  
+
   findMinLogisticsCost <- function(split_number){
     pc_split <- pc[n_split==split_number]
     pc_split <- merge(pc_split,ShipSize,by="k",allow.cartesian=TRUE)
@@ -1104,11 +1065,11 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   # df_fin <- minLogisticsCost(pc,0, naics, recycle_check_file_path)
 
   # setnames(df_fin,c("time","path","minc"),c("Attribute2_ShipTime","MinPath","MinGmnql"))
-  # 
+  #
   # setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
-  # 
+  #
   # setkey(pc,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
-  # 
+  #
   # pc <- pc[df_fin]
 
   setkey(pc,Production_zone,Consumption_zone)	### return to original sort order
