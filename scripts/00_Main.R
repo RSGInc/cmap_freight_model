@@ -18,7 +18,6 @@
 if (!exists("scenario")) {
   library(envDocument)
   scriptpath <- envDocument::get_scriptpath()
-  #print(paste("envDocument::get_scriptpath():", envDocument::get_scriptpath()))
 
   if (length(scriptpath) < 2) {
     #How to get script directory: http://stackoverflow.com/a/30306616/283973
@@ -27,7 +26,7 @@ if (!exists("scenario")) {
 
     if (length(scriptDir)  < 2) {
       scriptDir <- getwd()
-      #print(paste("getwd():", getwd()))
+
       if (!file.exists("cmap_freight_model.Rproj"))
         stop(
           paste0(
@@ -129,6 +128,8 @@ rm(basedir, scenario, steps, steptitles, stepscripts)
 #Load file paths to model inputs, outputs, and workspaces
 source("./scripts/00_File_Locations.R")
 
+#Print number of parallel processes that we are set to run
+print(paste0("maxcostrscripts: ", model$scenvars$maxcostrscripts))
 print(paste0("maxrscriptinstances: ", model$scenvars$maxrscriptinstances))
 
 #-----------------------------------------------------------------------------------
@@ -144,41 +145,23 @@ progressManager(
   model$logs$Profile_Summary
 )
 
-# split this out to run steps seperately more easily
-# functionalize the step 3 stuff to allow just certain markets to run
-# change 03_PMG_Controller.R to using parallel instead of tasklist approach
-
-#lapply(model$stepscripts,source)
-
-isPeterDevelopmentMode <-
-  dir.exists(model$outputdir) &&
-  (length(list.files(model$outputdir)) > 10) &&
-  interactive() &&
-  (Sys.info()[["user"]] == "peter.andrews")
-
 if(!model$scenvars$runSensitivityAnalysis) {
-  if (isPeterDevelopmentMode && exists("ineligible")) {
-    print("NOTICE -- skipping steps 1 & 2 because in isPeterDevelopmentMode")
-  } else {
-    source(model$stepscripts[1]) #Firm Synthesis
-    source(model$stepscripts[2]) #Prepare Procurement Markets
-  }
+  source(model$stepscripts[1]) #Firm Synthesis
+  source(model$stepscripts[2]) #Prepare Procurement Markets
   source(model$stepscripts[3]) #PMG Controller (running the PMGs)
   source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
-  
-  if (isPeterDevelopmentMode) {
-    print("NOTICE -- skipping steps 5:11 because in isPeterDevelopmentMode")
-  } else {
+
+  if(runTruckTouringModel){
     for (scriptNumber in 5:11) {
       source(model$stepscripts[scriptNumber]) #Truck Touring Model
     }
   }
-  
+
   save(
     list = c("model", model$steps),
     file = file.path(model$outputdir, "modellists.Rdata")
   )
-  
+
   progressManager(
     "Stop",
     model$logs$Step_RunTimes,
@@ -188,6 +171,7 @@ if(!model$scenvars$runSensitivityAnalysis) {
     model$logs$Profile_Log,
     model$logs$Profile_Summary
   )
+
 } else {
   # First change the functions from rFreight package
   loadInputs2 <- function(filelist, inputdir) {
@@ -200,7 +184,7 @@ if(!model$scenvars$runSensitivityAnalysis) {
   }
   environment(loadInputs2) <- environment(loadInputs)
   assignInNamespace("loadInputs",loadInputs2,ns = "rFreight")
-  
+
   # Running Sensitivity Analysis
   source(model$stepscripts[1]) #Firm Synthesis
   modeCategories <- fread("./DashBoard/mode_description.csv", stringsAsFactors = FALSE)
@@ -224,15 +208,15 @@ if(!model$scenvars$runSensitivityAnalysis) {
     allPC <- rbind(allPC,get("pc",envir = sensitivity_environment))
   }
   rsgcolordf <- data.frame(red=c(246,0,99,186,117,255,82), green=c(139,111,175,18,190,194,77), blue=c(31,161,94,34,233,14,133), colornames=c("orange","marine","leaf","cherry","sky","sunshine","violet"))
-  
+
   rsgcolordf <- rsgcolordf %>% mutate(hexValue=rgb(red,green,blue,maxColorValue=255))
-  
+
   makeMoreColors <- colorRampPalette(rsgcolordf$hexValue)
   modeColors <- data.table(mode=c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None"),colors=makeMoreColors(8),stringsAsFactors = FALSE,key = "mode")
   modeColors2 <- makeMoreColors(8)
   names(modeColors2) <- c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None")
-  
+
   allPC %>% ggplot(aes(x=Distance_Bin))+geom_bar(aes(fill=Mode),position = "fill")+theme_bw()+facet_grid(Commodity_SCTG~B0)+scale_fill_manual("Mode",values = makeMoreColors(6))+scale_x_continuous(breaks = seq(0,75,10),labels = label_distance)+xlab("Distance")
-  
+
   saveRDS(allPC,file = file.path(model$outputdir,"sensitivity_run1.rds"))
 }

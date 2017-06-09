@@ -25,6 +25,11 @@ outputRworkspace  <- FALSE #if TRUE save workspace with all files at the end of 
 outputlog         <- FALSE #sink output and messages to log.txt
 outputprofile     <- FALSE #profiling (set to FALSE for production)
 
+#Which parts of the model should be run?
+runTruckTouringModel <- FALSE # Run truck touring model (steps 5-11)
+runSensitivityAnalysis <- FALSE #Run Sensitivity analysis
+
+
 #---------------------------------------------------------------------
 #Step 1 Firm Synthesis
 #---------------------------------------------------------------------
@@ -181,15 +186,9 @@ wgtmax_2axl <- 35000
 wgtmax_3axl <- 65000
 wgtmax_semi <- 100000
 
-
-
-
 #---------------------------------------------------------------------
 #Step 11 Prepare trip table
 #---------------------------------------------------------------------
 annualfactor        <- 310  #sampling factor to convert annual truck flows to daily
 
-#---------------------------------------------------------------------
-#Step NA Run Sensitivity analysis
-#---------------------------------------------------------------------
-runSensitivityAnalysis <- FALSE
+
