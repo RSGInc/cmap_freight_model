@@ -318,7 +318,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 
   startTime <- Sys.time()
 
-  # print(paste0(startTime, " Entering: ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
+  print(paste0(startTime, " Entering: ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
 
     s <- sctg[iSCTG]
 
@@ -865,7 +865,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
   ram_to_use <- 60 #Gb
-  n_splits <- ceiling(nconst*nprodt*size_per_row/((ram_to_use*(1024**3))/cores_used))
+  n_splits <- ceiling(nconst*nprodt*size_per_row/((ram_to_use*(1024**3))/(cores_used+2)))
   # while (nconst * prodcg[,.N] > cthresh) {
   #   n_splits <- n_splits + 1L
   #   nconst <- as.numeric(ceiling(conscg[,.N] / n_splits))
@@ -921,11 +921,11 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #   sampleIter <- sampleIter + 1
   # }
   # pc <- pc[sampled_pairs,on=c("BuyerID","SellerID")]
-  print(paste0("Number of rows in pairs file: ",pc[,.N]))
-  print(paste0("Size of output of pairs file: ",object.size(pc)/(1024**3)," Gb"))
-  print(paste0("Size per row of pairs file: ",object.size(pc)/as.numeric(pc[,.N])," Gb"))
+  # print(paste0("Number of rows in pairs file: ",pc[,.N]))
+  # print(paste0("Size of output of pairs file: ",object.size(pc)/(1024**3)," Gb"))
+  # print(paste0("Size per row of pairs file: ",object.size(pc)/as.numeric(pc[,.N])," Gb"))
   
-  fwrite(pc,file = file.path(model$outputdir,paste0(naics, "_g", g, ".sampledpairs.csv")))
+  #fwrite(pc,file = file.path(model$outputdir,paste0(naics, "_g", g, ".sampledpairs.csv")))
 
   # Need to make sure that there is enough capacity to fullfill the demand.
 
@@ -1076,7 +1076,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
   ##Rprof("profile1.out")
   
-  size_per_row <- 10010 #bytes
+  size_per_row <- 12010 #bytes
   npct <- as.numeric(pc[,.N])
   nShipSizet <- as.numeric(ShipSize[,.N])
   n_splits <- ceiling(npct*nShipSizet*size_per_row/((ram_to_use*(1024**3))/cores_used))
@@ -1190,7 +1190,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
 
   #write out the costs file for this group
-  print(paste0("Number of rows less than ",model$scenvars$combinationthreshold,": ",pc[,.N]<model$scenvars$combinationthreshold))
+  # print(paste0("Number of rows less than ",model$scenvars$combinationthreshold,": ",pc[,.N]<model$scenvars$combinationthreshold))
 
   fwrite(pc, file = file.path(model$outputdir,paste0(naics, "_g", g, ".costs.csv")))
 
