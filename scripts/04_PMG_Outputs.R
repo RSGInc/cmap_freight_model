@@ -70,7 +70,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
   pairs[, Quantity.Traded := as.character(Quantity.Traded)]
   pairs[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
   #Temporary addition. Think of a permanent fix
-  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "lssbd", "Seller.Size", "Buyer.Size") := NULL]
+  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "Seller.Size", "Buyer.Size", "Buyer.NAICS","Seller.NAICS","Buyer.NAICS2","Seller.NAICS2") := NULL]
   naicspairs[[naics_run_number]] <- pairs
 } #end for (naics_run_number in 1:nrow(naics_set))
 
@@ -109,8 +109,8 @@ file.create(recycle_check_file_path) #will create or truncate
 ## ---------------------------------------------------------------
 ## add code for shipments b/n zone and port (create input file first)
 loadPackage("plyr")
-pair1 <- pairs[MinPath < 51]
-pair2 <- pairs[MinPath >= 51]		## international shipping
+pair1 <- pairs[!(MinPath %in% c(51:54))]
+pair2 <- pairs[MinPath %in% c(51:54)]		## international shipping
 load(file.path(model$basedir, "rFreight/data/data_modepath_ports.rda"))
 ports <- as.data.table(data_modepath_ports)
 setkey(ports, Production_zone, Consumption_zone)

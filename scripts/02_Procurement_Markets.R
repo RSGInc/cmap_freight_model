@@ -382,7 +382,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 
   dfsp[path %in% 53:54 & weight<CAP1FTL,avail:=FALSE] #Eliminate International Transload-Direct from choice set if Shipment Size < 1 FTL
   
-  dfsp[iSCTG %in% c(16:19) & path %in% c(1:54), avail:=FALSE]
+  dfsp[!(iSCTG %in% c(16:19)) & (path %in% c(55:57)), avail:=FALSE]
 
   dfsp <- dfsp[avail==TRUE & !is.na(minc)]		## limit to only viable choices before finding minimum path
 

@@ -490,7 +490,6 @@ calcSampleGroups <- function(ncons,nprod,cthresh,sprod,cprl){
   nconst <- as.numeric(ncons)
   nprodt <- as.numeric(nprod)
   nSuppliersPerBuyer <- model$scenvars$nSuppliersPerBuyer
-  cthresh <- cthresh*0.5
   if(sprod){
     while (nconst * nSuppliersPerBuyer > cthresh) {
       ngroups <- ngroups + 1L
