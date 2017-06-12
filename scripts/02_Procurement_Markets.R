@@ -318,7 +318,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 
   startTime <- Sys.time()
 
-  print(paste0(startTime, " Entering: ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
+  # print(paste0(startTime, " Entering: ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
 
     s <- sctg[iSCTG]
 
@@ -424,7 +424,7 @@ minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
 
   for (iSCTG in unique(df$Commodity_SCTG)){
 
-    print(paste(Sys.time(), "iSCTG: ",iSCTG))
+    # print(paste(Sys.time(), "iSCTG: ",iSCTG))
 
 
 
@@ -843,12 +843,12 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nSupplierPerBuyer <- model$scenvars$nSupplierPerBuyer
   distBased <- model$scenvars$distBased
 
-  FAF_distance <- fread("./DashBoard/FAF_distance.csv",key = c("oFAFZONE","dFAFZONE"))
+  FAF_distance <- fread(file.path(model$basedir,"scenarios","base","inputs","FAF_Distance.csv"),key = c("oFAFZONE","dFAFZONE"))
   FAF_distance[,Distance_Bin:= findInterval(distance,distance_bins)]
   if(model$scenvars$distBased){
-    supplier_selection_distribution <- fread("./DashBoard/DistanceDistribution.csv",key=c("SCTG","DistanceGroup"))
+    supplier_selection_distribution <- fread(file.path(model$basedir,"scenarios","base","inputs","DistanceDistribution.csv"),key=c("SCTG","DistanceGroup"))
   } else {
-    supplier_selection_distribution <- fread("./DashBoard/TonnageDistribution.csv",key=c("SCTG","DistanceGroup"))
+    supplier_selection_distribution <- fread(file.path(model$basedir,"scenarios","base","inputs","TonnageDistribution.csv"),key=c("SCTG","DistanceGroup"))
   }
 
 
