@@ -843,7 +843,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nSupplierPerBuyer <- model$scenvars$nSupplierPerBuyer
   distBased <- model$scenvars$distBased
 
-  FAF_distance <- fread(file.path(model$basedir,"scenarios","base","inputs","FAF_Distance.csv"),key = c("oFAFZONE","dFAFZONE"))
+  FAF_distance <- fread(file.path(model$basedir,"scenarios","base","inputs","FAF_distance.csv"),key = c("oFAFZONE","dFAFZONE"))
   FAF_distance[,Distance_Bin:= findInterval(distance,distance_bins)]
   if(model$scenvars$distBased){
     supplier_selection_distribution <- fread(file.path(model$basedir,"scenarios","base","inputs","DistanceDistribution.csv"),key=c("SCTG","DistanceGroup"))
