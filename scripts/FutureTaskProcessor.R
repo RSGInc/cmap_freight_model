@@ -6,7 +6,7 @@ library(future)
 #plan(multiprocess, workers=min((myNumTasks+1), MAX_PROCESSES))
 #it is not required to specify workers -- if not then it will default to future::availableCores()
 #use myNumTasks+1 because future uses one process for itself.
-
+options(future.globals.maxSize=model$scenvars$futureMaxSize)
 asyncTasksRunning <- list()
 
 startAsyncTask <-
