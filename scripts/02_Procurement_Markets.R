@@ -16,7 +16,7 @@
 
 ##############################################################################################
 
-# Initialize the variables if note performing sensitivity analysis
+# Initialize the variables if not performing sensitivity analysis
 
 if(!exists("B0")) B0 <- 10000
 if(exists("B1")) model$scenvars$B1 <- B1
@@ -25,7 +25,9 @@ if(!exists("B3_mult")) B3_mult <- 1
 if(exists("B4")) model$scenvars$B4 <- B4
 if(!exists("B5_mult")) B5_mult <- 1
 
-if(exists("choice")) print(sprintf("Design %d:\n B0: %d, B1: %d, B2: %1.2f, B3: %1.2f, B4: %d, B5: %1.2f\n",get("choice",envir = .GlobalEnv), B0, model$scenvars$B1, B2_mult, B3_mult, model$scenvars$B4, B5_mult))
+if(exists("choice") & model$scenvars$runParameters) print(sprintf("Design %d:\n B0: %d, B1: %d, B2: %1.2f, B3: %1.2f, B4: %d, B5: %1.2f\n",get("choice",envir = .GlobalEnv), B0, model$scenvars$B1, B2_mult, B3_mult, model$scenvars$B4, B5_mult))
+
+
 
 
 
@@ -37,6 +39,10 @@ if(exists("choice")) print(sprintf("Design %d:\n B0: %d, B1: %d, B2: %1.2f, B3: 
 #-----------------------------------------------------------------------------------
 
 progressStart(pmg,3)
+if(model$scenvars$runSensitivityAnalysis&!model$scenvars$runParameters){
+  skims <- fread(file.path(model$skimsdir,"data_modepath_skims.csv"))
+  # mesozone_gcd <- fread(file.path(model$skimsdir,pmg$inputs$mesozone_gcd))
+}
 
 
 
@@ -628,35 +634,22 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
 
 predict_logit <- function(df,mod,cal=NULL,calcats=NULL,iter=1){
 
-
-
   #prepare the data items used in the model application and calibration
-
   alts <- max(mod$CHID)
-
   ut<-diag(alts)
-
   ut[upper.tri(ut)] <- 1
-
+  
   if(is.numeric(df$CATEGORY)) df[,CATEGORY:=paste0("x",CATEGORY)] #numeric causes problems with column names
 
   cats <- unique(df$CATEGORY)
-
   mod<-data.table(expand.grid.df(mod,data.frame(CATEGORY=cats)))
-
+  
   if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
-
-
 
   for (iters in 1:iter){
 
     #calibration loops
-
-
-
-    if(iters>1 & !is.null(cal) & !is.null(calcats)){
-
-
+      if(iters>1 & !is.null(cal) & !is.null(calcats)){
 
       #After first iternaton compare results with targets and calculate adjustment
 
@@ -745,7 +738,6 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,iter=1){
   return(simchoice)
 
 }
-
 
 
 create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
@@ -864,7 +856,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nconst <- as.numeric(conscg[,.N])
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
-  ram_to_use <- 60 #Gb
+  ram_to_use <- 80 #Gb
   n_splits <- ceiling(nconst*nprodt*size_per_row/((ram_to_use*(1024**3))/(cores_used+2)))
   # while (nconst * prodcg[,.N] > cthresh) {
   #   n_splits <- n_splits + 1L
@@ -937,8 +929,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
   #buyer/seller attributes
 
-
-
+  
   pc[, c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind") := 0]
 
   pc[Buyer.Size <= 49, emple49 := 1]
@@ -1151,7 +1142,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
          "Buyer.SCTG","Buyer.Size","ConVal","PurchaseAmountTons", "OutputCapacityTons",
 
-         "weight", "Distance", "ship_size", "distchannel",
+         "weight", "Distance", "Ship_size", "distchannel",
 
          "lssbd", "MinGmnql", "MinPath") := NULL]
 

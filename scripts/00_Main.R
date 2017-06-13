@@ -190,16 +190,16 @@ if(!model$scenvars$runSensitivityAnalysis) {
   )
 } else {
   # First change the functions from rFreight package
-  loadInputs2 <- function(filelist, inputdir) {
-    if (length(filelist) > 0) {
-      for (i in 1:length(filelist)) {
-        if (!exists(names(filelist)[i]))
-          assign(names(filelist)[i], fread(file.path(inputdir, filelist[[i]])), envir = .GlobalEnv)
-      }
-    }
-  }
-  environment(loadInputs2) <- environment(loadInputs)
-  assignInNamespace("loadInputs",loadInputs2,ns = "rFreight")
+  # loadInputs2 <- function(filelist, inputdir) {
+  #   if (length(filelist) > 0) {
+  #     for (i in 1:length(filelist)) {
+  #       if (!exists(names(filelist)[i]))
+  #         assign(names(filelist)[i], fread(file.path(inputdir, filelist[[i]])), envir = .GlobalEnv)
+  #     }
+  #   }
+  # }
+  # environment(loadInputs2) <- environment(loadInputs)
+  # assignInNamespace("loadInputs",loadInputs2,ns = "rFreight")
   
   # Running Sensitivity Analysis
   source(model$stepscripts[1]) #Firm Synthesis
@@ -207,32 +207,55 @@ if(!model$scenvars$runSensitivityAnalysis) {
   setkey(modeCategories, ModeNumber)
   mesoFAFCBPMap <- fread('./DashBoard/meso_faf_map.csv')
   setkey(mesoFAFCBPMap,"MESOZONE")
-  source("./sensitivity/sensitivity_variables.R")
   sensitivity_environment <- new.env()
   allPC <- data.table()
-  endPMG <- FALSE
-  for(choice in exp_design[,`Choice situation`]){
-    B0 <- exp_design[choice,B0]
-    B1 <- exp_design[choice,B1]
-    B2_mult <- exp_design[choice,B2]
-    B3_mult <- exp_design[choice,B3]
-    B4 <- exp_design[choice,B4]
-    B5_mult <- exp_design[choice,B5]
-    if(choice==nrow(exp_design)) endPMG <- TRUE
-    source(model$stepscripts[2]) #Prepare Procurement Markets
-    source(model$stepscripts[3]) #PMG Controller (running the PMGs)
-    allPC <- rbind(allPC,get("pc",envir = sensitivity_environment))
+  endPMG <- FALSE # To make sure the progressEnd in Procurement Script doesn't run until the entire run is done.
+  if(model$scenvars$runParameters){
+    for(choice in exp_design[,`Choice situation`]){
+      B0 <- exp_design[choice,B0]
+      B1 <- exp_design[choice,B1]
+      B2_mult <- exp_design[choice,B2]
+      B3_mult <- exp_design[choice,B3]
+      B4 <- exp_design[choice,B4]
+      B5_mult <- exp_design[choice,B5]
+      if(choice==nrow(exp_design)) endPMG <- TRUE
+      source(model$stepscripts[2]) #Prepare Procurement Markets
+      source(model$stepscripts[3]) #PMG Controller (running the PMGs)
+      allPC <- rbind(allPC,get("pc",envir = sensitivity_environment))
+    }
+  } else {
+    if(!dir.exists(file.path(model$outputdir,"skimsoutput"))) dir.create(file.path(model$outputdir,"skimsoutput"))
+    model$sensitivitydir <- file.path(model$basedir,"scenarios","base","sensitivity","skims")
+    skimsChoicedirs <- list.dirs(model$sensitivitydir,recursive = FALSE)
+    pmg$inputs[["skims"]] <- NULL
+    limitruns <- length(skimsChoicedirs)
+    for(choice in skimsChoicedirs[1:limitruns]){
+      print(choice)
+      model$skimsdir <- choice
+      if(choice==skimsChoicedirs[limitruns]) endPMG <- TRUE
+      source(model$stepscripts[2]) #Prepare Procurement Markets
+      source(model$stepscripts[3]) #PMG Controller (running the PMGs)
+      # allPC <- rbind(allPC,get("pc",envir = sensitivity_environment))
+    }
+    readData <- function(loc){
+      filelist <- list.files(loc,recursive = FALSE,full.names = TRUE)
+      return(rbindlist(lapply(filelist,function(x) get(load(x)))))
+    }
+    outputLocation <- file.path(model$outputdir,"skimsoutput",basename(skimsChoicedirs))
+    allPC <- data.table(rbindlist(lapply(outputLocation[1:limitruns],readData)))
+    saveRDS(allPC,file = file.path(model$outputdir,"skimsoutput","sensitivityrun1.rds"))
+    # run skims here
   }
-  rsgcolordf <- data.frame(red=c(246,0,99,186,117,255,82), green=c(139,111,175,18,190,194,77), blue=c(31,161,94,34,233,14,133), colornames=c("orange","marine","leaf","cherry","sky","sunshine","violet"))
+  # rsgcolordf <- data.frame(red=c(246,0,99,186,117,255,82), green=c(139,111,175,18,190,194,77), blue=c(31,161,94,34,233,14,133), colornames=c("orange","marine","leaf","cherry","sky","sunshine","violet"))
+  # 
+  # rsgcolordf <- rsgcolordf %>% mutate(hexValue=rgb(red,green,blue,maxColorValue=255))
+  # 
+  # makeMoreColors <- colorRampPalette(rsgcolordf$hexValue)
+  # modeColors <- data.table(mode=c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None"),colors=makeMoreColors(8),stringsAsFactors = FALSE,key = "mode")
+  # modeColors2 <- makeMoreColors(8)
+  # names(modeColors2) <- c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None")
+  # 
+  # allPC %>% ggplot(aes(x=Distance_Bin))+geom_bar(aes(fill=Mode),position = "fill")+theme_bw()+facet_grid(Commodity_SCTG~B0)+scale_fill_manual("Mode",values = makeMoreColors(6))+scale_x_continuous(breaks = seq(0,75,10),labels = label_distance)+xlab("Distance")
   
-  rsgcolordf <- rsgcolordf %>% mutate(hexValue=rgb(red,green,blue,maxColorValue=255))
-  
-  makeMoreColors <- colorRampPalette(rsgcolordf$hexValue)
-  modeColors <- data.table(mode=c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None"),colors=makeMoreColors(8),stringsAsFactors = FALSE,key = "mode")
-  modeColors2 <- makeMoreColors(8)
-  names(modeColors2) <- c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None")
-  
-  allPC %>% ggplot(aes(x=Distance_Bin))+geom_bar(aes(fill=Mode),position = "fill")+theme_bw()+facet_grid(Commodity_SCTG~B0)+scale_fill_manual("Mode",values = makeMoreColors(6))+scale_x_continuous(breaks = seq(0,75,10),labels = label_distance)+xlab("Distance")
-  
-  saveRDS(allPC,file = file.path(model$outputdir,"sensitivity_run1.rds"))
+  # saveRDS(allPC,file = file.path(model$outputdir,"sensitivityrun1.rds"))
 }
