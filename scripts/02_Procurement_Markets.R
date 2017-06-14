@@ -862,10 +862,11 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #   n_splits <- n_splits + 1L
   #   nconst <- as.numeric(ceiling(conscg[,.N] / n_splits))
   # }
-  suppressWarnings(conscg[,n_split:=1:n_splits])
+  suppressWarnings(conscg[,':=' (n_split=1:n_splits,doSample=TRUE)])
+  prodcg[,availableForSample:=TRUE]
 
   sample_data <- function(split_number){
-    pc_split <- merge(prodcg,conscg[n_split==split_number][,n_split:=NULL],c("NAICS","Commodity_SCTG"), allow.cartesian = TRUE,suffixes = c(".supplier",".buyer"))
+    pc_split <- merge(prodcg[availableForSample==TRUE][,availableForSample:=NULL],conscg[n_split==split_number&doSample==TRUE][,c("n_split","doSample"):=NULL],by = c("NAICS","Commodity_SCTG"), allow.cartesian = TRUE,suffixes = c(".supplier",".buyer"))
     pc_split <- pc_split[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
     pc_split[,Distance_Bin:=FAF_distance[.(FAFZONE.supplier,FAFZONE.buyer),Distance_Bin]]
     pc_split[,Proportion:=supplier_selection_distribution[.(Commodity_SCTG,Distance_Bin),Proportion]]
@@ -873,25 +874,51 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     pc_split[,Proportion:=Proportion*(OutputCapacityTons/sum(OutputCapacityTons)),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
     min_proportion <- pc_split[Proportion>0,min(Proportion)]/1000
     pc_split[,Proportion:=Proportion+min_proportion]
-    resample <- TRUE
+    resample <- TRUE # Check to see all the sellers can meet the buyers demand.
     sampleIter <- 1
-    while(resample&sampleIter<10) {
+    while(resample&sampleIter<6) {
       sampled_pairs <- pc_split[, .(SellerID = sample(SellerID, min(.N, nSupplierPerBuyer), replace = FALSE, prob = Proportion)), by = .(BuyerID)]
       setkey(sampled_pairs, BuyerID, SellerID)
-      resample <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,sum(OutputCapacityTons)<unique(PurchaseAmountTons),by=.(BuyerID)][,sum(V1)] > ceiling(0.01*length(pc_split[,unique(BuyerID)])) # Investigate this part
+      resample <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,sum(OutputCapacityTons)<unique(PurchaseAmountTons),by=.(BuyerID)][,sum(V1)] > ceiling(0.01*length(pc_split[,unique(BuyerID)])) # Make sure that the buyers demand could be fulfilled.
+      
       # pc_split_partial <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")]
       # resample <- pc_split_partial[,sum(OutputCapacityTons)/.N,by=SellerID][,sum(V1)]<pc_split_partial[,sum(PurchaseAmountTons)/.N,by=BuyerID][,sum(V1)]
       sampleIter <- sampleIter+1
     }
+    # print(paste0("Number of sampling iterations for Sellers: ",sampleIter))
     # print(sprintf("Split Number: %d/%d",split_number,n_splits))
     # print(sprintf("Number of pc_split rows: %d", pc_split[,.N]))
     # print(paste0(object.size(pc_split)/(1024**3)," Gb"))
     # print(paste0(object.size(pc_split[sampled_pairs,on=c("BuyerID","SellerID")])/(1024**3)," Gb"))
     return(pc_split[sampled_pairs,on=c("BuyerID","SellerID")])
   }
-
   pc <- rbindlist(lapply(1:n_splits,sample_data))
-  
+  resampleBuyers <- TRUE # Check to make sure that all buyers can meet the sellers Capacity.
+  sampleBuyersIter <- 1L
+  sellersMaxedOut <- pc[,sum(PurchaseAmountTons)>unique(OutputCapacityTons),by=.(SellerID)][V1==TRUE,SellerID]
+  buyersOfSellers <- pc[SellerID %in% sellersMaxedOut,unique(BuyerID)]
+  resampleBuyers <- (length(sellersMaxedOut)>0)
+  prodcg[SellerID %in% sellersMaxedOut,availableForSample:=FALSE]
+  conscg[!(BuyerID %in% buyersOfSellers), doSample:=FALSE]
+  sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,sum(V1)]
+  # buyDifference <- pc[BuyerID%in%buyersOfSellers,sum(OutputCapacityTons)-unique(PurchaseAmountTons),by=BuyerID][,sum(V1)]
+  # print(paste0("Original Number of Combinations: ", pc[,.N]))
+  while(resampleBuyers & (sampleBuyersIter<6) & (prodcg[availableForSample==TRUE,.N]>0)){
+    new_pc <- rbindlist(lapply(1:n_splits,sample_data))
+    validIndex <- new_pc[pc[,.(BuyerID,SellerID,Commodity_SCTG)],.I[is.na(NAICS)],on=c("BuyerID","SellerID","Commodity_SCTG")]
+    pc <- unique(rbind(pc,new_pc[validIndex])[,Proportion:=NULL])
+    rm(new_pc)
+    sellersMaxedOut <- pc[,sum(PurchaseAmountTons)>unique(OutputCapacityTons),by=.(SellerID)][V1==TRUE,SellerID]
+    buyersOfSellers <- pc[SellerID %in% sellersMaxedOut,unique(BuyerID)]
+    # new_buyDifference <- pc[BuyerID%in%buyersOfSellers,sum(OutputCapacityTons)-unique(PurchaseAmountTons),by=BuyerID][,sum(V1)]
+    new_sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,sum(V1)]
+    resampleBuyers <- (new_sellDifference < (1.10*sellDifference)) # Increased in the maxed out capacity of the sellers should be at least 10%. 
+    prodcg[SellerID %in% sellersMaxedOut,availableForSample:=FALSE]
+    conscg[!(BuyerID %in% buyersOfSellers), doSample:=FALSE]
+    sampleBuyersIter <- sampleBuyersIter + 1
+    print(paste0("Number of Combinations: ",pc[,.N]))
+  }
+  # print(paste0("Number of sampling iterations for Buyers: ", sampleBuyersIter))
   ############
   # Split group approach
   ###########
