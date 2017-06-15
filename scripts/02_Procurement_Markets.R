@@ -628,11 +628,138 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
 
 }
 
+# pc_sim_distchannel <- function(pcFlows, distchannel_food, distchannel_mfg, c_sctg_cat, calibration = NULL){
+#   # Update progress log
+#   
+#   ### Create variables used in the distribution channel model
+#   
+#   # Create employment and industry dummy variables
+#   pcFlows[, c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind") := 0L]
+#   pcFlows[Buyer.Size <= 49, emple49 := 1]
+#   pcFlows[Buyer.Size >= 50 & Buyer.Size <= 199, emp50t199 := 1]
+#   pcFlows[Buyer.Size >= 200, empge200 := 1]
+#   
+#   pcFlows[,Seller.NAICS2:=substr(Seller.NAICS,1,2)]
+#   pcFlows[Seller.NAICS2 %in% 31:33, mfgind := 1]
+#   pcFlows[Seller.NAICS2 %in% 48:49, trwind := 1]
+#   pcFlows[Seller.NAICS2 %in% c(42, 48, 49), whind := 1]
+#   
+#   pcFlows[,Buyer.NAICS2:=substr(Buyer.NAICS,1,2)]
+#   pcFlows[Buyer.NAICS2 %in% 31:33, mfgind := 1]
+#   pcFlows[Buyer.NAICS2 %in% 48:49, trwind := 1]
+#   pcFlows[Buyer.NAICS2 %in% c(42, 48, 49), whind := 1]
+#   
+#   
+#   # Add the FAME SCTG category for comparison with calibration targets
+#   pcFlows[, CATEGORY := famesctg[Commodity_SCTG]]
+#   setkey(pcFlows, Production_zone, Consumption_zone)
+#   
+#   # Add zone to zone distances
+#   pcFlows <- merge(pcFlows, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
+#   setnames(pcFlows, "GCD", "Distance")
+#   
+#   # Update progress log
+#   # Missing for now
+#   
+#   
+#   print(paste(Sys.time(), "Applying distribution channel model"))
+#   
+#   #Apply choice model of distribution channel and iteratively adjust the ascs
+#   
+#   #The model estimated for mfg products was applied to all other SCTG commodities
+#   
+#   inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
+#   
+#   if (inNumber > 0) {
+#     
+#     # Sort on vars so simulated choice is ordered correctly
+#     model_vars_food <- c("CATEGORY", distchannel_food[TYPE == "Variable", unique(VAR)])
+#     model_ascs_food <- distchannel_food[TYPE == "Constant", unique(VAR)]
+#     setkeyv(pcFlows, model_vars_food) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
+#     
+#     pcFlows_food <- pcFlows[Commodity_SCTG %in% c(1:9),model_vars_food,with=FALSE]
+#     pcFlows_food_weight <- pcFlows[SCTG %in% 1:9,Tons]
+#     
+#     df <- pcFlows_food[, list(Start = min(.I), Fin = max(.I)), by = model_vars_food, with=FALSE] #unique combinations of model coefficients
+#     
+#     df[, (model_ascs_food) := 1] #add 1s for constants to each group in df
+#     
+#     print(paste(Sys.time(), nrow(df), "unique combinations"))
+#     
+#     if(!is.null(calibration)){
+#       
+#       pcFlows[SCTG %in% c(1:9), DistChannel := predict_logit(df, distchannel_food, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_food_weight, iter=4, path = file.path(model$inputdir,"model_distchannel_food_cal.csv"))]
+#       
+#     } else {
+#       
+#       pcFlows[SCTG %in% 1:9, DistChannel := predict_logit(df, distchannel_food,distchan_cal,distchan_calcats,iter=4)]  
+#       
+#     }
+#     # 
+#     # pc[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_food, distchan_cal, distchan_calcats, 4)]
+#     
+#   }
+#   
+#   # Update progress log
+#   
+#   
+#   print(paste(Sys.time(), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
+#   
+#   ### Apply choice model of distribution channel for other industries
+#   
+#   # The model estimated for mfg products is applied to all other SCTG commoditie
+#   
+#   outNumber <- nrow(pcFlows[!Commodity_SCTG %in% c(1:9)])
+#   
+#   if (outNumber > 0) {
+#     
+#     # Sort on vars so simulated choice is ordered correctly
+#     model_vars_mfg <- c("CATEGORY", distchannel_mfg[TYPE == "Variable", unique(VAR)])
+#     model_ascs_mfg <- distchannel_mfg[TYPE == "Constant", unique(VAR)]
+#     
+#     setkeyv(pc, model_vars_mfg) #sorted on vars so simulated choice is ordered correctly
+#     
+#     pcFlows_mfg <- pcFlows[!Commodity_SCTG %in% c(1:9),model_vars_mfg,with=FALSE]
+#     pcFlows_mfg_weight <- pcFlows[!Commodity_SCTG %in% c(1:9),Tons]
+#     
+#     df <- pcFlows_mfg[, list(Start = min(.I), Fin = max(.I)), by = model_vars_mfg] #unique combinations of model coefficients
+#     
+#     ####do this in the function (seems unecessary here)?
+#     
+#     df[, (model_ascs_mfg) := 1] #add 1s for constants to each group in df
+#     
+#     print(paste(Sys.time(), nrow(df), "unique combinations"))
+#     
+#     # Simulate choice -- with calibration if calibration targets provided
+#     if(!is.null(calibration)){
+#       
+#       pcFlows[!SCTG %in% c(1:9), DistChannel := predict_logit(df, distchannel_mfg, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_mfg_weight, iter=4)]
+#       
+#     } else {
+#       
+#       pcFlows[!SCTG %in% 1:9, DistChannel := predict_logit(df, distchannel_mfg,distchan_cal,distchan_calcats,iter=4)]
+#       
+#     }
+#     
+#     # pc[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_mfg, distchan_cal, distchan_calcats, 4)]
+#     
+#   }
+#   
+#   rm(df)
+#   print(paste(Sys.time(), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
+#   
+#   
+#   # Update progress log
+#   
+#   return(pcFlows)
+#   
+#   
+# }
 
 
 
 
-predict_logit <- function(df,mod,cal=NULL,calcats=NULL,iter=1){
+predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,iter=1,path=NULL){
 
   #prepare the data items used in the model application and calibration
   alts <- max(mod$CHID)
@@ -645,78 +772,65 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,iter=1){
   mod<-data.table(expand.grid.df(mod,data.frame(CATEGORY=cats)))
   
   if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
+  
+  if(iter > 1){
+    if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
+    if(!is.null(weight)) weightcats <- data.table(weight,cat=unlist(lapply(cats,function(x) rep(x,max(df$Fin[df$CATEGORY==x])-min(df$Start[df$CATEGORY==x])+1))))
+    modcoeffs <- list()
+  }
 
   for (iters in 1:iter){
-
     #calibration loops
-      if(iters>1 & !is.null(cal) & !is.null(calcats)){
+    if(iters>1 & !is.null(cal) & !is.null(calcats)){
 
-      #After first iternaton compare results with targets and calculate adjustment
-
-      sim <- sapply(cats,function(x) tabulate(simchoice[min(df$Start[df$CATEGORY==x]):max(df$Fin[df$CATEGORY==x])],nbins=alts))
-
-      sim <- sim/colSums(sim)
-
-
+    #After first iternaton compare results with targets and calculate adjustment
+      if(is.null(weight)){ # do count of choices
+        sim <- sapply(cats,function(x) tabulate(simchoice[min(df$Start[df$CATEGORY==x]):max(df$Fin[df$CATEGORY==x])],nbins=alts))
+        
+        sim <- prop.table(sim, margin = 2)
+        dimnames(sim) <- list(NULL, cats)
+      } else { # do weighted sum of choices
+        sim <- dcast.data.table(data.table(weightcats,simchoice), simchoice~cat, fun=sum, value.var="weight")
+        sim <- merge(data.table(simchoice = 1:alts), sim, by = "simchoice", all.x = TRUE)
+        sim[is.na(sim)] <- 0
+        sim <- as.matrix(sim[, cats, with = FALSE])
+        sim <- as.data.table(prop.table(sim, margin = 2))
+      }
+      
 
       if(length(unique(calcats$CHOICE))<length(unique(calcats$CHID))) {#the sim choices need to be aggregated to the calibration data
-
         sim <- cbind(calcats,sim)
-
         sim <- melt(sim,id.vars=c("CHOICE","CHID"),variable.name="CATEGORY")
-
         sim <- sim[,list(MODEL=sum(value)),by=list(CHOICE,CATEGORY)]
-
         sim <- merge(sim,cal,c("CATEGORY","CHOICE"))
-
+        sim[MODEL==0,MODEL:=0.001] # Stop dividing it with 0
         sim[,ascadj:=log(TARGET/MODEL)]
-
         adj <- merge(sim,calcats,"CHOICE",allow.cartesian=TRUE)[,list(CATEGORY,CHID,ascadj)]
-
       }
 
       if(length(unique(calcats$CHOICE))>length(unique(calcats$CHID))) {#the calibratin data need to be aggregated to the sim choices
-
         caldat <- merge(cal[CATEGORY %in% cats],calcats,"CHOICE")
-
         caldat <- caldat[,list(TARGET=sum(TARGET)),by=list(CATEGORY,CHID)]
-
         sim <- data.table(CHID=1:nrow(sim),sim)
-
         sim <- melt(sim,id.vars=c("CHID"),variable.name="CATEGORY")
-
         sim <- merge(sim,caldat,c("CATEGORY","CHID"))
-
+        sim[value==0,value:=0.001] # Stop dividing it with 0
         sim[,ascadj:=log(TARGET/value)]
-
         adj <- sim[,list(CATEGORY,CHID,ascadj)]
 
       }
 
       if(length(unique(calcats$CHOICE))==length(unique(calcats$CHID))) {
-
         stop("Need to implment calibration for same calcats as choice alts")
-
         #####TODO add in some code here for the other case:
-
         #####1. same number of choices as calibration categories (so not aggregation required)
-
-
-
       }
 
-
-
       mod <- merge(mod,adj,c("CATEGORY","CHID"))
-
       mod[TYPE=="Constant",COEFF:=COEFF+ascadj]
-
       mod[,ascadj:=NULL]
-
     }
-
-
-
+    
     #apply the choice model
 
     ### -- Heither, 08-06-2015: the following line was modified to use the pmin function to cap values at 600 before using the exponential function to prevent INF values --##
@@ -724,17 +838,16 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,iter=1){
     ##utils <- lapply(cats, function(y) sapply(1:alts, function(x) exp(rowSums(sweep(df[CATEGORY==y,mod[CHID==x & CATEGORY==y,VAR],with=F],2,mod[CHID==x & CATEGORY==y,COEFF],"*")))))
 
     utils <- lapply(cats, function(y) sapply(1:alts, function(x) exp(pmin(rowSums(sweep(df[CATEGORY==y,mod[CHID==x & CATEGORY==y,VAR],with=F],2,mod[CHID==x & CATEGORY==y,COEFF],"*")),600))))
-
-	utils <- lapply(1:length(cats),function(x) if(is.null(dim(utils[[x]]))){(utils[[x]]/sum(utils[[x]])) %*% ut} else {(utils[[x]]/rowSums(utils[[x]])) %*% ut})
-
+	  utils <- lapply(1:length(cats),function(x) if(is.null(dim(utils[[x]]))){(utils[[x]]/sum(utils[[x]])) %*% ut} else {(utils[[x]]/rowSums(utils[[x]])) %*% ut})
     utils <- do.call("rbind",utils)
-
+    set.seed(151)
     temprand <- runif(max(df$Fin))
-
     simchoice <- unlist(lapply(1:nrow(df),function(x) 1L + findInterval(temprand[df$Start[x]:df$Fin[x]],utils[x,])))
-
+    
+    # for calibration
+    if(iter>1) modcoeffs[[length(modecoeffs)+1]] <- mod
   }
-
+  if(iter > 1) fwrite(modcoeffs[[length(modecoeffs)]], file=path)
   return(simchoice)
 
 }
@@ -865,7 +978,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   suppressWarnings(conscg[,':=' (n_split=1:n_splits,doSample=TRUE)])
   prodcg[,availableForSample:=TRUE]
 
-  sample_data <- function(split_number){
+  sample_data <- function(split_number,fractionOfSupplierperBuyer=1.0,samplingforSeller=FALSE){
     pc_split <- merge(prodcg[availableForSample==TRUE][,availableForSample:=NULL],conscg[n_split==split_number&doSample==TRUE][,c("n_split","doSample"):=NULL],by = c("NAICS","Commodity_SCTG"), allow.cartesian = TRUE,suffixes = c(".supplier",".buyer"))
     pc_split <- pc_split[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
     pc_split[,Distance_Bin:=FAF_distance[.(FAFZONE.supplier,FAFZONE.buyer),Distance_Bin]]
@@ -877,20 +990,20 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     resample <- TRUE # Check to see all the sellers can meet the buyers demand.
     sampleIter <- 1
     while(resample&sampleIter<6) {
-      sampled_pairs <- pc_split[, .(SellerID = sample(SellerID, min(.N, nSupplierPerBuyer), replace = FALSE, prob = Proportion)), by = .(BuyerID)]
+      sampled_pairs <- pc_split[, .(SellerID = sample(SellerID, min(.N, ceiling(nSupplierPerBuyer*fractionOfSupplierperBuyer)), replace = FALSE, prob = Proportion)), by = .(BuyerID)]
       setkey(sampled_pairs, BuyerID, SellerID)
       resample <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,sum(OutputCapacityTons)<unique(PurchaseAmountTons),by=.(BuyerID)][,sum(V1)] > ceiling(0.01*length(pc_split[,unique(BuyerID)])) # Make sure that the buyers demand could be fulfilled.
-      
+      resample  <- resample&!samplingforSeller
       # pc_split_partial <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")]
       # resample <- pc_split_partial[,sum(OutputCapacityTons)/.N,by=SellerID][,sum(V1)]<pc_split_partial[,sum(PurchaseAmountTons)/.N,by=BuyerID][,sum(V1)]
       sampleIter <- sampleIter+1
     }
-    # print(paste0("Number of sampling iterations for Sellers: ",sampleIter))
+    print(paste0("Number of sampling iterations for Sellers: ",sampleIter-1))
     # print(sprintf("Split Number: %d/%d",split_number,n_splits))
     # print(sprintf("Number of pc_split rows: %d", pc_split[,.N]))
     # print(paste0(object.size(pc_split)/(1024**3)," Gb"))
     # print(paste0(object.size(pc_split[sampled_pairs,on=c("BuyerID","SellerID")])/(1024**3)," Gb"))
-    return(pc_split[sampled_pairs,on=c("BuyerID","SellerID")])
+    return(pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,Proportion:=NULL])
   }
   pc <- rbindlist(lapply(1:n_splits,sample_data))
   resampleBuyers <- TRUE # Check to make sure that all buyers can meet the sellers Capacity.
@@ -902,9 +1015,10 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   conscg[!(BuyerID %in% buyersOfSellers), doSample:=FALSE]
   sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,sum(V1)]
   # buyDifference <- pc[BuyerID%in%buyersOfSellers,sum(OutputCapacityTons)-unique(PurchaseAmountTons),by=BuyerID][,sum(V1)]
-  # print(paste0("Original Number of Combinations: ", pc[,.N]))
-  while(resampleBuyers & (sampleBuyersIter<6) & (prodcg[availableForSample==TRUE,.N]>0)){
-    new_pc <- rbindlist(lapply(1:n_splits,sample_data))
+  print(paste0("Original Number of Combinations: ", pc[,.N]))
+  limitBuyersResampling <- 5
+  while(resampleBuyers & (sampleBuyersIter<=limitBuyersResampling) & (prodcg[availableForSample==TRUE,.N]>0)){
+    new_pc <- rbindlist(lapply(1:n_splits,sample_data,fractionOfSupplierperBuyer=(limitBuyersResampling/model$scenvars$nSuppliersPerBuyer),samplingforSeller=resampleBuyers))
     validIndex <- new_pc[pc[,.(BuyerID,SellerID,Commodity_SCTG)],.I[is.na(NAICS)],on=c("BuyerID","SellerID","Commodity_SCTG")]
     pc <- unique(rbind(pc,new_pc[validIndex])[,Proportion:=NULL])
     rm(new_pc)
@@ -918,35 +1032,8 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     sampleBuyersIter <- sampleBuyersIter + 1
     print(paste0("Number of Combinations: ",pc[,.N]))
   }
-  # print(paste0("Number of sampling iterations for Buyers: ", sampleBuyersIter))
-  ############
-  # Split group approach
-  ###########
-  # pc <- merge(prodcg,conscg,c("NAICS","Commodity_SCTG"), allow.cartesian = TRUE,suffixes = c(".supplier",".buyer"))
-  # pc <- pc[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
-  # pc[,Distance_Bin:=FAF_distance[.(FAFZONE.supplier,FAFZONE.buyer),Distance_Bin]]
-  # pc[,Proportion:=supplier_selection_distribution[.(Commodity_SCTG,Distance_Bin),Proportion]]
-  # pc[is.na(Proportion),Proportion:=0.0]
-  # pc[,Proportion:=Proportion*(OutputCapacityTons/sum(OutputCapacityTons)),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
-  # min_proportion <- pc[Proportion>0,min(Proportion)]/1000
-  # pc[,Proportion:=Proportion+min_proportion]
-  # resample <- TRUE
-  # sampleIter <- 1L
-  # while(resample & sampleIter < 20) {
-  #   sampled_pairs <- pc[, .(SellerID = sample(SellerID, min(.N, nSupplierPerBuyer), replace = FALSE, prob = Proportion)), by = .(BuyerID)]
-  #   setkey(sampled_pairs, BuyerID, SellerID)
-  #   resample <- pc[sampled_pairs,on=c("BuyerID","SellerID")][,sum(OutputCapacityTons)<unique(PurchaseAmountTons),by=.(BuyerID)][,any(V1)] # Investigate this part
-  #   # resample <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,sum(OutputCapacityTons)<unique(PurchaseAmountTons)]
-  #   sampleIter <- sampleIter + 1
-  # }
-  # pc <- pc[sampled_pairs,on=c("BuyerID","SellerID")]
-  # print(paste0("Number of rows in pairs file: ",pc[,.N]))
-  # print(paste0("Size of output of pairs file: ",object.size(pc)/(1024**3)," Gb"))
-  # print(paste0("Size per row of pairs file: ",object.size(pc)/as.numeric(pc[,.N])," Gb"))
-  
-  #fwrite(pc,file = file.path(model$outputdir,paste0(naics, "_g", g, ".sampledpairs.csv")))
+  print(paste0("Number of sampling iterations for Buyers: ", sampleBuyersIter-1))
 
-  # Need to make sure that there is enough capacity to fullfill the demand.
 
 
 
