@@ -6,3 +6,4 @@
 library
 scenarios/base/outputs*
 RunTimes.csv
+scenarios/base/sensitivity/skims/*
