@@ -207,21 +207,25 @@ if(!model$scenvars$runSensitivityAnalysis) {
   setkey(modeCategories, ModeNumber)
   mesoFAFCBPMap <- fread('./DashBoard/meso_faf_map.csv')
   setkey(mesoFAFCBPMap,"MESOZONE")
+  source(file = file.path(model$basedir,"scenarios","base","sensitivity","design","sensitivity_variables.R"))
   sensitivity_environment <- new.env()
   allPC <- data.table()
   endPMG <- FALSE # To make sure the progressEnd in Procurement Script doesn't run until the entire run is done.
+  if(!dir.exists(file.path(model$outputdir,"parametersOutput"))) dir.create(file.path(model$outputdir,"parametersOutput")) # Create the directory to save output.
   if(model$scenvars$runParameters){
-    for(choice in exp_design[,`Choice situation`]){
-      B0 <- exp_design[choice,B0]
-      B1 <- exp_design[choice,B1]
-      B2_mult <- exp_design[choice,B2]
-      B3_mult <- exp_design[choice,B3]
-      B4 <- exp_design[choice,B4]
-      B5_mult <- exp_design[choice,B5]
+    for(choice in exp_design[,Choice]){
+      model$parameterdir <- file.path(model$outputdir,"parametersOutput")
+      model$parameterdesign <- choice
+      B0 <- exp_design[choice,as.numeric(B0)]
+      B1 <- exp_design[choice,as.numeric(B1)]
+      B2_mult <- exp_design[choice,as.numeric(B2)]
+      B3_mult <- exp_design[choice,as.numeric(B3)]
+      B4 <- exp_design[choice,as.numeric(B4)]
+      B5_mult <- exp_design[choice,as.numeric(B5)]
       if(choice==nrow(exp_design)) endPMG <- TRUE
       source(model$stepscripts[2]) #Prepare Procurement Markets
       source(model$stepscripts[3]) #PMG Controller (running the PMGs)
-      allPC <- rbind(allPC,get("pc",envir = sensitivity_environment))
+      # allPC <- rbind(allPC,get("pc",envir = sensitivity_environment))
     }
   } else {
     if(!dir.exists(file.path(model$outputdir,"skimsoutput"))) dir.create(file.path(model$outputdir,"skimsoutput"))
