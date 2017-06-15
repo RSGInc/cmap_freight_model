@@ -70,7 +70,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
   pairs[, Quantity.Traded := as.character(Quantity.Traded)]
   pairs[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
   #Temporary addition. Think of a permanent fix
-  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "Seller.Size", "Buyer.Size", "Buyer.NAICS","Seller.NAICS","Buyer.NAICS2","Seller.NAICS2") := NULL]
+  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "Seller.Size", "Buyer.Size", "Buyer.NAICS","Seller.NAICS","Buyer.NAICS2","Seller.NAICS2","CATEGORY","FAFZONE.buyer","FAFZONE.supplier") := NULL]
   naicspairs[[naics_run_number]] <- pairs
 } #end for (naics_run_number in 1:nrow(naics_set))
 
@@ -180,10 +180,11 @@ setkey(pair2, SellerID, BuyerID, NAICS, Commodity_SCTG)
 pair2 <- pair2[df_fin]
 pair2[, Attribute1_UnitCost := MinGmnql / PurchaseAmountTons]
 pair2[, Attribute2_ShipTime := Attribute2_ShipTime / 24] 			### Convert from hours to days
-
-pairs <- as.data.table(rbind.fill(pair1, pair2))
+rm(pairs,df_fin)
+gc()
+pairs <- rbindlist(list(pair1, pair2),fill=TRUE)
 rm(pair1, pair2, ports)
-
+gc()
 ## ---------------------------------------------------------------
 ## Heither, revised 02-07-2016: This code block checks the pairs file for ineligible modes selected between zone pairs.
 setkey(pairs, Production_zone, Consumption_zone, MinPath)
