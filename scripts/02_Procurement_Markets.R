@@ -992,7 +992,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     while(resample&sampleIter<6) {
       buyersWithMultipleSellers <- pc_split[,.N,by=BuyerID]
       if(buyersWithMultipleSellers[N==1,.N]>0){
-        sampled_pairs <- rbindlist(list(pc_split[BuyerID %in% buyersWithMultipleSellers[N>1,BuyerID], .(SellerID = sample(SellerID, min(.N, ceiling(nSupplierPerBuyer*fractionOfSupplierperBuyer)), replace = FALSE, prob = Proportion)), by = .(BuyerID)],pc_split[BuyerID %in% buyersWithMultipleSellers[N==1,BuyerID],.(BuyerID,SellerID)]))
+        sampled_pairs <- rbindlist(list(if(pc_split[BuyerID %in% buyersWithMultipleSellers[N>1,BuyerID],length(BuyerID)]>0) pc_split[BuyerID %in% buyersWithMultipleSellers[N>1,BuyerID], .(SellerID = sample(SellerID, min(.N, ceiling(nSupplierPerBuyer*fractionOfSupplierperBuyer)), replace = FALSE, prob = Proportion)), by = .(BuyerID)],pc_split[BuyerID %in% buyersWithMultipleSellers[N==1,BuyerID],.(BuyerID,SellerID)]))
       } else {
         sampled_pairs <- pc_split[, .(SellerID = sample(SellerID, min(.N, ceiling(nSupplierPerBuyer*fractionOfSupplierperBuyer)), replace = FALSE, prob = Proportion)), by = .(BuyerID)]
       }
