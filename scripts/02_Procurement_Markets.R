@@ -212,7 +212,7 @@ sctg[Category=="Finished goods (FG)",paste0("B0",c(32:45,47:50)) := sctg[Categor
 #Define the logistics cost function used in the mode path model
 
 calcLogisticsCost <- function(dfspi,s,path){
-  
+  set.seed(151)
   setnames(dfspi,c("pounds","weight","value","lssbd","time","cost"))
 
   ## variables from model$scenvars
@@ -359,8 +359,9 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
     # dfsp <- dfsp[!(is.na(time)&is.na(cost))]
     # print(paste0("Partial: ", object.size(dfsp)/(1024**3)," Gb"))
     
+    dfsp[,minc:=unlist(lapply(paths,function(x) calcLogisticsCost(dfsp[path==x,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,x)))] # Previous code
 
-    dfsp[,minc:=calcLogisticsCost(.SD[,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,unique(path)),by=path] # Faster implementation of above code
+    # dfsp[,minc:=calcLogisticsCost(.SD[,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,unique(path)),by=path] # Faster implementation of above code
 
     ## variables from model$scenvars
 
@@ -369,8 +370,6 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
     CAP1FTL      <- model$scenvars$CAP1FTL		#Capacity of 1 Full Truckload
 
     CAP1Airplane <- model$scenvars$CAP1Airplane	#Capacity of 1 Airplane Cargo Hold
-
-
 
   dfsp[,avail:=TRUE]
 
@@ -524,34 +523,6 @@ minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
 
 }
 
-## ---------------------------------------------------------------
-######################
-### Edition with 1 group per NAICS group
-#####################
-# create_pmg_sample_groups <- function(naics,groups,sprod){
-#   # sort by sizes
-# 
-#   setkey(consc, Size)
-# 
-#   setkey(prodc, Size)
-# 
-#   prodconsratio <- sum(prodc$OutputCapacityTons)/sum(consc$PurchaseAmountTons)
-# 
-#   if(prodconsratio < 1.1){ #TODO need to move this to variables
-# 
-#     #reduce consumption to ratio is >=1.1
-# 
-#     suppressWarnings(consc[,PurchaseAmountTons:=PurchaseAmountTons/1.1*prodconsratio])
-# 
-#   }
-# 
-# 
-#   #merge together to create all of the pairs of firms for this group and commodity
-# 
-# 
-#   set.seed(151)
-#   suppressWarnings(consc[,group:=1:groups])
-# }
 
 ######################
 ### Edition with multiple groups per NAICS group
@@ -628,139 +599,141 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
 
 }
 
-# pc_sim_distchannel <- function(pcFlows, distchannel_food, distchannel_mfg, c_sctg_cat, calibration = NULL){
-#   # Update progress log
-#   
-#   ### Create variables used in the distribution channel model
-#   
-#   # Create employment and industry dummy variables
-#   pcFlows[, c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind") := 0L]
-#   pcFlows[Buyer.Size <= 49, emple49 := 1]
-#   pcFlows[Buyer.Size >= 50 & Buyer.Size <= 199, emp50t199 := 1]
-#   pcFlows[Buyer.Size >= 200, empge200 := 1]
-#   
-#   pcFlows[,Seller.NAICS2:=substr(Seller.NAICS,1,2)]
-#   pcFlows[Seller.NAICS2 %in% 31:33, mfgind := 1]
-#   pcFlows[Seller.NAICS2 %in% 48:49, trwind := 1]
-#   pcFlows[Seller.NAICS2 %in% c(42, 48, 49), whind := 1]
-#   
-#   pcFlows[,Buyer.NAICS2:=substr(Buyer.NAICS,1,2)]
-#   pcFlows[Buyer.NAICS2 %in% 31:33, mfgind := 1]
-#   pcFlows[Buyer.NAICS2 %in% 48:49, trwind := 1]
-#   pcFlows[Buyer.NAICS2 %in% c(42, 48, 49), whind := 1]
-#   
-#   
-#   # Add the FAME SCTG category for comparison with calibration targets
-#   pcFlows[, CATEGORY := famesctg[Commodity_SCTG]]
-#   setkey(pcFlows, Production_zone, Consumption_zone)
-#   
-#   # Add zone to zone distances
-#   pcFlows <- merge(pcFlows, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
-#   setnames(pcFlows, "GCD", "Distance")
-#   
-#   # Update progress log
-#   # Missing for now
-#   
-#   
-#   print(paste(Sys.time(), "Applying distribution channel model"))
-#   
-#   #Apply choice model of distribution channel and iteratively adjust the ascs
-#   
-#   #The model estimated for mfg products was applied to all other SCTG commodities
-#   
-#   inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
-#   
-#   if (inNumber > 0) {
-#     
-#     # Sort on vars so simulated choice is ordered correctly
-#     model_vars_food <- c("CATEGORY", distchannel_food[TYPE == "Variable", unique(VAR)])
-#     model_ascs_food <- distchannel_food[TYPE == "Constant", unique(VAR)]
-#     setkeyv(pcFlows, model_vars_food) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
-#     
-#     pcFlows_food <- pcFlows[Commodity_SCTG %in% c(1:9),model_vars_food,with=FALSE]
-#     pcFlows_food_weight <- pcFlows[SCTG %in% 1:9,Tons]
-#     
-#     df <- pcFlows_food[, list(Start = min(.I), Fin = max(.I)), by = model_vars_food, with=FALSE] #unique combinations of model coefficients
-#     
-#     df[, (model_ascs_food) := 1] #add 1s for constants to each group in df
-#     
-#     print(paste(Sys.time(), nrow(df), "unique combinations"))
-#     
-#     if(!is.null(calibration)){
-#       
-#       pcFlows[SCTG %in% c(1:9), DistChannel := predict_logit(df, distchannel_food, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_food_weight, iter=4, path = file.path(model$inputdir,"model_distchannel_food_cal.csv"))]
-#       
-#     } else {
-#       
-#       pcFlows[SCTG %in% 1:9, DistChannel := predict_logit(df, distchannel_food,distchan_cal,distchan_calcats,iter=4)]  
-#       
-#     }
-#     # 
-#     # pc[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_food, distchan_cal, distchan_calcats, 4)]
-#     
-#   }
-#   
-#   # Update progress log
-#   
-#   
-#   print(paste(Sys.time(), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
-#   
-#   ### Apply choice model of distribution channel for other industries
-#   
-#   # The model estimated for mfg products is applied to all other SCTG commoditie
-#   
-#   outNumber <- nrow(pcFlows[!Commodity_SCTG %in% c(1:9)])
-#   
-#   if (outNumber > 0) {
-#     
-#     # Sort on vars so simulated choice is ordered correctly
-#     model_vars_mfg <- c("CATEGORY", distchannel_mfg[TYPE == "Variable", unique(VAR)])
-#     model_ascs_mfg <- distchannel_mfg[TYPE == "Constant", unique(VAR)]
-#     
-#     setkeyv(pc, model_vars_mfg) #sorted on vars so simulated choice is ordered correctly
-#     
-#     pcFlows_mfg <- pcFlows[!Commodity_SCTG %in% c(1:9),model_vars_mfg,with=FALSE]
-#     pcFlows_mfg_weight <- pcFlows[!Commodity_SCTG %in% c(1:9),Tons]
-#     
-#     df <- pcFlows_mfg[, list(Start = min(.I), Fin = max(.I)), by = model_vars_mfg] #unique combinations of model coefficients
-#     
-#     ####do this in the function (seems unecessary here)?
-#     
-#     df[, (model_ascs_mfg) := 1] #add 1s for constants to each group in df
-#     
-#     print(paste(Sys.time(), nrow(df), "unique combinations"))
-#     
-#     # Simulate choice -- with calibration if calibration targets provided
-#     if(!is.null(calibration)){
-#       
-#       pcFlows[!SCTG %in% c(1:9), DistChannel := predict_logit(df, distchannel_mfg, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_mfg_weight, iter=4)]
-#       
-#     } else {
-#       
-#       pcFlows[!SCTG %in% 1:9, DistChannel := predict_logit(df, distchannel_mfg,distchan_cal,distchan_calcats,iter=4)]
-#       
-#     }
-#     
-#     # pc[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_mfg, distchan_cal, distchan_calcats, 4)]
-#     
-#   }
-#   
-#   rm(df)
-#   print(paste(Sys.time(), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
-#   
-#   
-#   # Update progress log
-#   
-#   return(pcFlows)
-#   
-#   
-# }
+pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibration = NULL){
+  # Update progress log
+  
+  
+  ### Create variables used in the distribution channel model
+  # Create a new table so the preceding table isn't modified
+  pcFlows <- copy(pc)
+
+  # Create employment and industry dummy variables
+  pcFlows[, c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind") := 0L]
+  pcFlows[Buyer.Size <= 49, emple49 := 1]
+  pcFlows[Buyer.Size >= 50 & Buyer.Size <= 199, emp50t199 := 1]
+  pcFlows[Buyer.Size >= 200, empge200 := 1]
+
+  pcFlows[,Seller.NAICS2:=substr(Seller.NAICS,1,2)]
+  pcFlows[Seller.NAICS2 %in% 31:33, mfgind := 1]
+  pcFlows[Seller.NAICS2 %in% 48:49, trwind := 1]
+  pcFlows[Seller.NAICS2 %in% c(42, 48, 49), whind := 1]
+
+  pcFlows[,Buyer.NAICS2:=substr(Buyer.NAICS,1,2)]
+  pcFlows[Buyer.NAICS2 %in% 31:33, mfgind := 1]
+  pcFlows[Buyer.NAICS2 %in% 48:49, trwind := 1]
+  pcFlows[Buyer.NAICS2 %in% c(42, 48, 49), whind := 1]
+
+
+  # Add the FAME SCTG category for comparison with calibration targets
+  pcFlows[, CATEGORY := famesctg[Commodity_SCTG]]
+  setkey(pcFlows, Production_zone, Consumption_zone)
+
+  # Add zone to zone distances
+  pcFlows <- merge(pcFlows, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
+  setnames(pcFlows, "GCD", "Distance")
+
+  # Update progress log
+  # Missing for now
+
+
+  print(paste(Sys.time(), "Applying distribution channel model"))
+
+  #Apply choice model of distribution channel and iteratively adjust the ascs
+
+  #The model estimated for mfg products was applied to all other SCTG commodities
+  
+
+  inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
+
+  if (inNumber > 0) {
+
+    # Sort on vars so simulated choice is ordered correctly
+    model_vars_food <- c("CATEGORY", distchannel_food[TYPE == "Variable", unique(VAR)])
+    model_ascs_food <- distchannel_food[TYPE == "Constant", unique(VAR)]
+    setkeyv(pcFlows, model_vars_food) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
+
+    pcFlows_food <- pcFlows[Commodity_SCTG %in% c(1:9),model_vars_food,with=FALSE]
+    pcFlows_food_weight <- pcFlows[Commodity_SCTG %in% 1:9,PurchaseAmountTons]
+
+    df <- pcFlows_food[, list(Start = min(.I), Fin = max(.I)), by = model_vars_food, with=FALSE] #unique combinations of model coefficients
+
+    df[, (model_ascs_food) := 1] #add 1s for constants to each group in df
+
+    print(paste(Sys.time(), nrow(df), "unique combinations"))
+
+    if(!is.null(calibration)){
+
+      pcFlows[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchannel_food, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_food_weight, path = file.path(model$inputdir,"model_distchannel_food_cal.csv"), iter = 4)]
+
+    } else {
+
+      pcFlows[Commodity_SCTG %in% 1:9, distchannel := predict_logit(df, distchannel_food,cal=distchan_cal,calcats=distchan_calcats)]
+
+    }
+
+  }
+
+  # Update progress log
+
+
+  print(paste(Sys.time(), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
+
+  ### Apply choice model of distribution channel for other industries
+
+  # The model estimated for mfg products is applied to all other SCTG commoditie
+
+  outNumber <- nrow(pcFlows[!Commodity_SCTG %in% c(1:9)])
+
+  if (outNumber > 0) {
+
+    # Sort on vars so simulated choice is ordered correctly
+    model_vars_mfg <- c("CATEGORY", distchannel_mfg[TYPE == "Variable", unique(VAR)])
+    model_ascs_mfg <- distchannel_mfg[TYPE == "Constant", unique(VAR)]
+
+    setkeyv(pcFlows, model_vars_mfg) #sorted on vars so simulated choice is ordered correctly
+
+    pcFlows_mfg <- pcFlows[!Commodity_SCTG %in% c(1:9),model_vars_mfg,with=FALSE]
+    pcFlows_mfg_weight <- pcFlows[!Commodity_SCTG %in% c(1:9),PurchaseAmountTons]
+
+    df <- pcFlows_mfg[, list(Start = min(.I), Fin = max(.I)), by = model_vars_mfg] #unique combinations of model coefficients
+
+    ####do this in the function (seems unecessary here)?
+
+    df[, (model_ascs_mfg) := 1] #add 1s for constants to each group in df
+
+    print(paste(Sys.time(), nrow(df), "unique combinations"))
+
+    # Simulate choice -- with calibration if calibration targets provided
+    if(!is.null(calibration)){
+
+      pcFlows[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchannel_mfg, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_mfg_weight, path = file.path(model$inputdir,"model_distchannel_mfg_cal.csv"), iter=4)]
+
+    } else {
+
+      pcFlows[!Commodity_SCTG %in% 1:9, distchannel := predict_logit(df, distchannel_mfg,cal = distchan_cal,calcats = distchan_calcats)]
+
+    }
+
+  }
+
+  rm(df)
+  print(paste(Sys.time(), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
+
+
+  # Update progress log
+
+  return(pcFlows)
+
+
+}
 
 
 
 
-predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,iter=1,path=NULL){
 
+predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,iter=1){
+  
+  
   #prepare the data items used in the model application and calibration
   alts <- max(mod$CHID)
   ut<-diag(alts)
@@ -771,7 +744,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,iter=1,path=N
   cats <- unique(df$CATEGORY)
   mod<-data.table(expand.grid.df(mod,data.frame(CATEGORY=cats)))
   
-  if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
+  # if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
   
   if(iter > 1){
     if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
@@ -798,7 +771,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,iter=1,path=N
       }
       
 
-      if(length(unique(calcats$CHOICE))<length(unique(calcats$CHID))) {#the sim choices need to be aggregated to the calibration data
+      if(length(unique(calcats$CHOICE))<length(unique(calcats$CHID))) { # the sim choices need to be aggregated to the calibration data
         sim <- cbind(calcats,sim)
         sim <- melt(sim,id.vars=c("CHOICE","CHID"),variable.name="CATEGORY")
         sim <- sim[,list(MODEL=sum(value)),by=list(CHOICE,CATEGORY)]
@@ -808,7 +781,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,iter=1,path=N
         adj <- merge(sim,calcats,"CHOICE",allow.cartesian=TRUE)[,list(CATEGORY,CHID,ascadj)]
       }
 
-      if(length(unique(calcats$CHOICE))>length(unique(calcats$CHID))) {#the calibratin data need to be aggregated to the sim choices
+      if(length(unique(calcats$CHOICE))>length(unique(calcats$CHID))) { # the calibratin data need to be aggregated to the sim choices
         caldat <- merge(cal[CATEGORY %in% cats],calcats,"CHOICE")
         caldat <- caldat[,list(TARGET=sum(TARGET)),by=list(CATEGORY,CHID)]
         sim <- data.table(CHID=1:nrow(sim),sim)
@@ -845,9 +818,9 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,iter=1,path=N
     simchoice <- unlist(lapply(1:nrow(df),function(x) 1L + findInterval(temprand[df$Start[x]:df$Fin[x]],utils[x,])))
     
     # for calibration
-    if(iter>1) modcoeffs[[length(modecoeffs)+1]] <- mod
+    if(iter>1) modcoeffs[[length(modcoeffs)+1]] <- mod
   }
-  if(iter > 1) fwrite(modcoeffs[[length(modecoeffs)]], file=path)
+  if(iter > 1) fwrite(modcoeffs[[length(modcoeffs)]], file=path)
   return(simchoice)
 
 }
@@ -969,7 +942,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nconst <- as.numeric(conscg[,.N])
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
-  ram_to_use <- 80 #Gb
+  ram_to_use <- 5 #Gb
   n_splits <- ceiling(nconst*nprodt*size_per_row/((ram_to_use*(1024**3))/(cores_used+2)))
   # while (nconst * prodcg[,.N] > cthresh) {
   #   n_splits <- n_splits + 1L
@@ -1020,7 +993,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   while(resampleBuyers & (sampleBuyersIter<=limitBuyersResampling) & (prodcg[availableForSample==TRUE,.N]>0)){
     new_pc <- rbindlist(lapply(1:n_splits,sample_data,fractionOfSupplierperBuyer=(limitBuyersResampling/model$scenvars$nSuppliersPerBuyer),samplingforSeller=resampleBuyers))
     validIndex <- new_pc[pc[,.(BuyerID,SellerID,Commodity_SCTG)],.I[is.na(NAICS)],on=c("BuyerID","SellerID","Commodity_SCTG")]
-    pc <- unique(rbind(pc,new_pc[validIndex])[,Proportion:=NULL])
+    pc <- unique(rbind(pc,new_pc[validIndex]))
     rm(new_pc)
     sellersMaxedOut <- pc[,sum(PurchaseAmountTons)>unique(OutputCapacityTons),by=.(SellerID)][V1==TRUE,SellerID]
     buyersOfSellers <- pc[SellerID %in% sellersMaxedOut,unique(BuyerID)]
@@ -1042,98 +1015,101 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #Distribution size model
 
   #buyer/seller attributes
-
-  
-  pc[, c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind") := 0]
-
-  pc[Buyer.Size <= 49, emple49 := 1]
-
-  pc[Buyer.Size >= 50 & Buyer.Size <= 199, emp50t199 := 1]
-
-  pc[Buyer.Size >= 200, empge200 := 1]
-
-
-
-  pc[,Seller.NAICS2:=substr(Seller.NAICS,1,2)]
-
-  pc[Seller.NAICS2 %in% 31:33, mfgind := 1]
-
-  pc[Seller.NAICS2 %in% 48:49, trwind := 1]
-
-  pc[Seller.NAICS2 %in% c(42, 48, 49), whind := 1]
-
-  pc[,Buyer.NAICS2:=substr(Buyer.NAICS,1,2)]
-
-  pc[Buyer.NAICS2 %in% 31:33, mfgind := 1]
-
-  pc[Buyer.NAICS2 %in% 48:49, trwind := 1]
-
-  pc[Buyer.NAICS2 %in% c(42, 48, 49), whind := 1]
-
-
-
-  pc[, CATEGORY := famesctg[Commodity_SCTG]]
-
-
-
-  setkey(pc, Production_zone, Consumption_zone)
-
-  pc <- merge(pc, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
-
-  setnames(pc, "GCD", "Distance")
-
-
-
-  print(paste(Sys.time(), "Applying distribution channel model"))
-
-  #Apply choice model of distribution channel and iteratively adjust the ascs
-
-  #The model estimated for mfg products was applied to all other SCTG commodities
-
-  inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
-
-  if (inNumber > 0) {
-
-    setkeyv(pc, c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"]))) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
-
-    pc_food <- pc[Commodity_SCTG %in% c(1:9),c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])),with=F]
-
-    df <- pc_food[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])))] #unique combinations of model coefficients
-
-    df[, eval(unique(distchan_food$VAR[distchan_food$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-
-    print(paste(Sys.time(), nrow(df), "unique combinations"))
-
-    pc[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_food, distchan_cal, distchan_calcats, 4)]
-
+  if(model$scenvars$ApplicationMode){
+    pc <- pc_sim_distchannel(pc = pc, distchannel_food = distchan_food, distchannel_mfg = distchan_mfg)
+  } else {
+    pc <- pc_sim_distchannel(pc = pc, distchannel_food = distchan_food, distchannel_mfg = distchan_mfg, calibration = TRUE)
   }
-
-  print(paste(Sys.time(), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
-
-  outNumber <- nrow(pc[!Commodity_SCTG %in% c(1:9)])
-
-  if (outNumber > 0) {
-
-    setkeyv(pc, c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"]))) #sorted on vars so simulated choice is ordered correctly
-
-    pc_mfg <- pc[!Commodity_SCTG %in% c(1:9),c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])),with=F]
-
-    df <- pc_mfg[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])))] #unique combinations of model coefficients
-
-    ####do this in the function (seems unecessary here)?
-
-    df[, eval(unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-
-    print(paste(Sys.time(), nrow(df), "unique combinations"))
-
-    pc[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_mfg, distchan_cal, distchan_calcats, 4)]
-
-  }
-
-  rm(df)
-
-  print(paste(Sys.time(), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
-
+  # pc[, c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind") := 0]
+  # 
+  # pc[Buyer.Size <= 49, emple49 := 1]
+  # 
+  # pc[Buyer.Size >= 50 & Buyer.Size <= 199, emp50t199 := 1]
+  # 
+  # pc[Buyer.Size >= 200, empge200 := 1]
+  # 
+  # 
+  # 
+  # pc[,Seller.NAICS2:=substr(Seller.NAICS,1,2)]
+  # 
+  # pc[Seller.NAICS2 %in% 31:33, mfgind := 1]
+  # 
+  # pc[Seller.NAICS2 %in% 48:49, trwind := 1]
+  # 
+  # pc[Seller.NAICS2 %in% c(42, 48, 49), whind := 1]
+  # 
+  # pc[,Buyer.NAICS2:=substr(Buyer.NAICS,1,2)]
+  # 
+  # pc[Buyer.NAICS2 %in% 31:33, mfgind := 1]
+  # 
+  # pc[Buyer.NAICS2 %in% 48:49, trwind := 1]
+  # 
+  # pc[Buyer.NAICS2 %in% c(42, 48, 49), whind := 1]
+  # 
+  # 
+  # 
+  # pc[, CATEGORY := famesctg[Commodity_SCTG]]
+  # 
+  # 
+  # 
+  # setkey(pc, Production_zone, Consumption_zone)
+  # 
+  # pc <- merge(pc, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
+  # 
+  # setnames(pc, "GCD", "Distance")
+  # 
+  # 
+  # 
+  # print(paste(Sys.time(), "Applying distribution channel model"))
+  # 
+  # #Apply choice model of distribution channel and iteratively adjust the ascs
+  # 
+  # #The model estimated for mfg products was applied to all other SCTG commodities
+  # 
+  # inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
+  # 
+  # if (inNumber > 0) {
+  # 
+  #   setkeyv(pc, c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"]))) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
+  # 
+  #   pc_food <- pc[Commodity_SCTG %in% c(1:9),c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])),with=F]
+  # 
+  #   df <- pc_food[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])))] #unique combinations of model coefficients
+  # 
+  #   df[, eval(unique(distchan_food$VAR[distchan_food$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
+  # 
+  #   print(paste(Sys.time(), nrow(df), "unique combinations"))
+  # 
+  #   pc[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_food, distchan_cal, distchan_calcats, 4)]
+  # 
+  # }
+  # 
+  # print(paste(Sys.time(), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
+  # 
+  # outNumber <- nrow(pc[!Commodity_SCTG %in% c(1:9)])
+  # 
+  # if (outNumber > 0) {
+  # 
+  #   setkeyv(pc, c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"]))) #sorted on vars so simulated choice is ordered correctly
+  # 
+  #   pc_mfg <- pc[!Commodity_SCTG %in% c(1:9),c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])),with=F]
+  # 
+  #   df <- pc_mfg[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])))] #unique combinations of model coefficients
+  # 
+  #   ####do this in the function (seems unecessary here)?
+  # 
+  #   df[, eval(unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
+  # 
+  #   print(paste(Sys.time(), nrow(df), "unique combinations"))
+  # 
+  #   pc[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_mfg, distchan_cal, distchan_calcats, 4)]
+  # 
+  # }
+  # 
+  # rm(df)
+  # 
+  # print(paste(Sys.time(), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
+  # 
 
 
   ### -- Heither, 10-15-2015: Enforce Distribution channel logical consistency -- ###
