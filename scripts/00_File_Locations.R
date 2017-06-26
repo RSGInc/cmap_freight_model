@@ -34,12 +34,14 @@ pmg[["inputs"]] <- within(pmg[["inputs"]], {
   sctg                            <-     "corresp_sctg_category.csv"               #correspondence between SCTG and descriptions
   mesozone_gcd                    <-     "data_mesozone_gcd.csv"                   #Mesozone to mesozone gcds
   skims                           <-     "data_modepath_skims.csv"
-  distchan_food                   <-     "model_distchannel_food.csv"              #Distribution channel MNL models
-  distchan_mfg                    <-     "model_distchannel_mfg.csv"
+  distchan_food                   <-     ifelse(!(model$scenvars$ApplicationMode&file.exists(file.path(model$inputdir,"model_distchannel_food_cal.csv"))),"model_distchannel_food.csv","model_distchannel_food_cal.csv")              #Distribution channel MNL models
+  distchan_mfg                    <-     ifelse(!(model$scenvars$ApplicationMode&file.exists(file.path(model$inputdir,"model_distchannel_mfg_cal.csv"))),"model_distchannel_mfg.csv","model_distchannel_mfg_cal.csv")
   distchan_cal                    <-     "model_distchannel_calibration.csv"
   ShipSize_food                   <-     "model_shipsize_food.csv"                 #Shipment Size MNL models
   ShipSize_mfg                    <-     "model_shipsize_mfg.csv"                  #Shipment Size MNL models
   ShipSize_cal                    <-     "model_shipsize_calibration.csv" #Shipment Size Distribution
+  faf_modeshare                   <-     "data_FAF_modeshare.csv"         # FAF mode Distribution
+  mode_description                <-     "data_mode_description.csv"      # Mode desciption
 })
 
 ##7 Vehicle Choice and Tour Pattern Inputs

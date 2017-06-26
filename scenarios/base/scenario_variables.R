@@ -30,7 +30,7 @@ outputprofile     <- FALSE #profiling (set to FALSE for production)
 #---------------------------------------------------------------------
 
 provalthreshold       <- 0.8     # threshold for percentage of purchase value for each commodity group met by producers
-combinationthreshold  <- 7000000 # max number of combinations of producers and consumers to enter into a procurement market game
+combinationthreshold  <- 3500000 # max number of combinations of producers and consumers to enter into a procurement market game
 consprodratiolimit    <- 1000000     # limit on ratio of consumers to producers to enter into the procurement market game
 foreignprodcostfactor <- 0.9     # producer cost factor for foreign produers (applied to unit costs)
 wholesalecostfactor    <- 1.2     # markup factor for wholesalers (applied to unit costs)
@@ -105,12 +105,12 @@ distance_bins <- seq(0,150000,100)
 maxcostrscripts <- min(8, max(1, future::availableCores()-1))
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
-maxrscriptinstances <- 8+1
+maxrscriptinstances <- 16+1
 #maxrscriptinstances <- maxcostrscripts
 
 # Max allocation of memory to each future instance
 availableRAM <- 120*(1024**3) # 120 Gb
-futureMaxSize <- max(10*(1024**3),availableRAM/max(maxcostrscripts,(maxrscriptinstances-1))) # At least 10 Gb per future.
+futureMaxSize <- max(15*(1024**3),availableRAM/max(maxcostrscripts,(maxrscriptinstances-1))) # At least 10 Gb per future.
 
 # should monitoring be run?
 pmgmonitoring <- TRUE
@@ -125,16 +125,21 @@ pmgnaicstorun <- c("113000","114000",
 	
 # Partial NAICS run
 # pmgnaicstorun <- c(
-#   326220, 212230,336414, 332420
+  # "2122A0"
+ # 326220, 212230,336414, 332420
 #   324122,327400,339910,327310,327200,327993,327992,327999,327991,327100,327330,
 #   113000, 211000,212100,
 #   "2123A0","312200"
-#   327100#, 327390, 327200, 324190, 211000, 324110, 327310, 327992, 339910
+  # 327100, 327390, 327200, 324190, 211000, 324110, 327310, 327992, 339910
 # )
 
 # NAICS group for Sensitivity Analysis
-# pmgnaicstorun <- c("1111B0","212100","3219A0","333920","336111","336112","336120","336212","336213","336214","336310","336350","336360","336370","336390","3363A0","336413","33641A","336500","336992","336999")
+# pmgnaicstorun <- c("212100","3219A0","333920","336120","336214","336310","336350","336360","336370",
+#                    "336390","3363A0","336413","33641A","336500","336992","336999")
 
+#pmgnaicstorun <- c("212100","2122A0","339910")#,"3219A0","333920","336120","336214","336310","336350","336360","336370",
+                  # "336390","3363A0","336413","33641A","336500","336992","336999")
+# pmgnaicstorun <- c("211000","2122A0","2123A0","327100","327200","327992","339910")
 
 #monitoring settings
 # pmgmonfrom <- "cheither@cmap.illinois.gov"
@@ -212,3 +217,11 @@ annualfactor        <- 310  #sampling factor to convert annual truck flows to da
 #---------------------------------------------------------------------
 runSensitivityAnalysis <- FALSE
 runParameters <- FALSE
+
+
+#--------------------------------------------------------------------
+# Run Mode
+#--------------------------------------------------------------------
+ApplicationMode <- TRUE
+distchannelCalibration <- FALSE & (!ApplicationMode)
+modechoiceCalibration <- TRUE & (!ApplicationMode) & (!distchannelCalibration)

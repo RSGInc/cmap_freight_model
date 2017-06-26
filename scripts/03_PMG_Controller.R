@@ -47,6 +47,32 @@ if (exitStatus != 0) {
   ))
 }
 
+if(model$scenvars$distchannelCalibration){
+  filelistmfg <- list.files(model$inputdir,pattern = "_g\\d+_model_distchannel_mfg",full.names = TRUE,recursive = FALSE)
+  if(length(filelistmfg)>0){
+    mfg_cal <- rbindlist(lapply(filelistmfg, fread, stringsAsFactors=FALSE))
+    saveRDS(mfg_cal,file=file.path(model$inputdir,"model_distchannel_mfg_cal.rds"))
+    mfg_calreduced <- mfg_cal[,.(COEFF=weighted.mean(COEFF,weight)),by=.(CATEGORY,CHID,CHDESC,VAR,TYPE)]
+    fwrite(mfg_calreduced,file=file.path(model$inputdir,"model_distchannel_mfg_cal.csv"))
+    file.remove(filelistmfg)
+  }
+  filelistfood <- list.files(model$inputdir,pattern = "_g\\d_model_distchannel_food")
+  if(length(filelistfood)>0){
+    food_cal <- rbindlist(lapply(filelistfood, fread, stringsAsFactors=FALSE))
+    saveRDS(food_cal,file=file.path(model$inputdir,"model_distchannel_mfg_cal.rds"))
+    food_calreduced <- food_cal[,.(COEFF=weighted.mean(COEFF,weight)),by=.(CATEGORY,CHID,CHDESC,VAR,TYPE)]
+    fwrite(food_calreduced,file=file.path(model$inputdir,"model_distchannel_food_cal.csv"))
+    file.remove(filelistfood)
+  }
+} else if (model$scenvars$modechoiceCalibration){
+  filelist <- list.files(model$inputdir,pattern = "\\d+_g\\d+_modechoiceconstants.rds",full.names = TRUE,recursive = FALSE)
+  modeChoiceConstants <- rbindlist(lapply(filelist,readRDS))
+  saveRDS(modeChoiceConstants,file = file.path(model$inputdir,"allModeChoiceConstants.rds"))
+  modeChoiceConstants <- modeChoiceConstants[,.(Constant=mean(Constant)),by=.(Commodity_SCTG,ODSegment,path,Mode.Domestic,NAICS)]
+  saveRDS(modeChoiceConstants,file = file.path(model$inputdir,"ModeChoiceConstants.rds"))
+  file.remove(filelist)
+}
+
 if(model$scenvars$runSensitivityAnalysis & model$scenvars$runParameters){
   # Create directory to collect the output
   if(!dir.exists(file.path(model$parameterdir,paste0("100_",model$parameterdesign)))){
@@ -88,6 +114,7 @@ if(model$scenvars$runSensitivityAnalysis & model$scenvars$runParameters){
   sensitivity_environment$pcbefore[, Mode := modeCategories[.(MinPath), Mode]]
   sensitivity_environment$pcbefore[, ':='(SkimFile = as.integer(unlist(strsplit(basename(model$skimsdir),"_"))[2]), Run = "Pre PMG")]
 }
+
 
 ### --------------------------------
 progressNextStep("Running PMGs")

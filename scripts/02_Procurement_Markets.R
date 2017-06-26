@@ -43,6 +43,7 @@ if(model$scenvars$runSensitivityAnalysis&!model$scenvars$runParameters){
   skims <- fread(file.path(model$skimsdir,"data_modepath_skims.csv"))
   # mesozone_gcd <- fread(file.path(model$skimsdir,pmg$inputs$mesozone_gcd))
 }
+if(model$scenvars$ApplicationMode) modeChoiceConstants <- readRDS(file = file.path(model$inputdir,"ModeChoiceConstants.rds"))
 
 
 
@@ -202,6 +203,11 @@ sctg[Category=="Finished goods (FG)",paste0("B0",31:46) := sctg[Category=="Finis
 sctg[Category=="Finished goods (FG)",paste0("B0",c(32:45,47:50)) := sctg[Category=="Finished goods (FG)",paste0("B0",c(32:45,47:50)), with = FALSE] * 0.25]
 
 
+# Change the mode descriptions
+
+c_path_mode <- mode_description[,.(path=ModeNumber,Mode.Domestic=Mode)]
+c_path_mode[Mode.Domestic=="Multiple",Mode.Domestic:="Rail"]
+
 
 ## ---------------------------------------------------------------
 
@@ -317,7 +323,9 @@ calcLogisticsCost <- function(dfspi,s,path){
 
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [keep NAICS/Commodity_SCTG, return as stand-alone data.table]
 
-minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_file_path){
+minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstants=NULL, recycle_check_file_path){
+  
+  
   
 
   callIdentifier <- paste0("minLogisticsCostSctgPaths(iSCTG=",iSCTG, ", paths=", paste0(collapse=", ", paths), " naics=", naics, ")")
@@ -326,50 +334,49 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 
   # print(paste0(startTime, " Entering: ", callIdentifier, " nrow(dfsp)=", nrow(dfsp)))
 
-    s <- sctg[iSCTG]
+  s <- sctg[iSCTG]
 
-    dfsp <- merge(dfsp,cskims[,c("Production_zone","Consumption_zone",paste0("time",paths),paste0("cost",paths)),with=F])
+  dfsp <- merge(dfsp,cskims[,c("Production_zone","Consumption_zone",paste0("time",paths),paste0("cost",paths)),with=F])
 
-    numrows <- nrow(dfsp)
-    #################
-    # Full approach
-    ##################
-    transform_merge_data <- function(path){
-      dfsp_data <- cbind(melt(dfsp[,c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd",paste0("time",path)),with=F], measure.vars=paste0("time",path), variable.name="timepath", value.name="time"),
+  numrows <- nrow(dfsp)
+  #################
+  # Full approach
+  ##################
+  transform_merge_data <- function(path){
+    dfsp_data <- cbind(melt(dfsp[,c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd","ODSegment",paste0("time",path)),with=F], measure.vars=paste0("time",path), variable.name="timepath", value.name="time"),
 
-                    melt(dfsp[,paste0("cost",path),with=F], measure.vars=paste0("cost",path), variable.name="costpath", value.name="cost"))
-      # print(paste0("Path: ",path))
-      # print(paste0("Full: ", object.size(dfsp_data)/(1024**3)," Gb"))
-      dfsp_data <- dfsp_data[!(is.na(time)&is.na(cost))]
-      # print(paste0("Partial: ", object.size(dfsp_data)/(1024**3)," Gb"))
-      suppressWarnings(dfsp_data[,path:=as.numeric(path)])
-    }
+                  melt(dfsp[,paste0("cost",path),with=F], measure.vars=paste0("cost",path), variable.name="costpath", value.name="cost"))
+    # print(paste0("Path: ",path))
+    # print(paste0("Full: ", object.size(dfsp_data)/(1024**3)," Gb"))
+    dfsp_data <- dfsp_data[!(is.na(time)&is.na(cost))]
+    # print(paste0("Partial: ", object.size(dfsp_data)/(1024**3)," Gb"))
+    suppressWarnings(dfsp_data[,path:=as.numeric(path)])
+  }
 
-    dfsp <- rbindlist(lapply(paths,transform_merge_data)) # Saves memory with a little compromise on time
-    
-    #################
-    # Group approach
-    ################
-    # dfsp <- cbind(melt(dfsp[,c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd",paste0("time",paths)),with=F], measure.vars=paste0("time",paths), variable.name="timepath", value.name="time"),
-    # 
-    #               melt(dfsp[,paste0("cost",paths),with=F], measure.vars=paste0("cost",paths), variable.name="costpath", value.name="cost"))
-    # suppressWarnings(dfsp[,path:=as.numeric(rep(paths,each=numrows))])
-    # print(paste0("Paths: ",paste0(paths,collapse = ",")))
-    # print(paste0("Full: ", object.size(dfsp)/(1024**3)," Gb"))
-    # dfsp <- dfsp[!(is.na(time)&is.na(cost))]
-    # print(paste0("Partial: ", object.size(dfsp)/(1024**3)," Gb"))
-    
-    dfsp[,minc:=unlist(lapply(paths,function(x) calcLogisticsCost(dfsp[path==x,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,x)))] # Previous code
+  dfsp <- rbindlist(lapply(paths,transform_merge_data)) # Saves memory with a little compromise on time
+  
+  #################
+  # Group approach
+  ################
+  # dfsp <- cbind(melt(dfsp[,c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd",paste0("time",paths)),with=F], measure.vars=paste0("time",paths), variable.name="timepath", value.name="time"),
+  # 
+  #               melt(dfsp[,paste0("cost",paths),with=F], measure.vars=paste0("cost",paths), variable.name="costpath", value.name="cost"))
+  # suppressWarnings(dfsp[,path:=as.numeric(rep(paths,each=numrows))])
+  # print(paste0("Paths: ",paste0(paths,collapse = ",")))
+  # print(paste0("Full: ", object.size(dfsp)/(1024**3)," Gb"))
+  # dfsp <- dfsp[!(is.na(time)&is.na(cost))]
+  # print(paste0("Partial: ", object.size(dfsp)/(1024**3)," Gb"))
+  
 
-    # dfsp[,minc:=calcLogisticsCost(.SD[,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,unique(path)),by=path] # Faster implementation of above code
+  ## variables from model$scenvars
 
-    ## variables from model$scenvars
+  CAP1Carload  <- model$scenvars$CAP1Carload    #Capacity of 1 Full Railcar
 
-    CAP1Carload  <- model$scenvars$CAP1Carload    #Capacity of 1 Full Railcar
+  CAP1FTL      <- model$scenvars$CAP1FTL		#Capacity of 1 Full Truckload
 
-    CAP1FTL      <- model$scenvars$CAP1FTL		#Capacity of 1 Full Truckload
+  CAP1Airplane <- model$scenvars$CAP1Airplane	#Capacity of 1 Airplane Cargo Hold
 
-    CAP1Airplane <- model$scenvars$CAP1Airplane	#Capacity of 1 Airplane Cargo Hold
+
 
   dfsp[,avail:=TRUE]
 
@@ -387,13 +394,35 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 
   dfsp[path %in% 53:54 & weight<CAP1FTL,avail:=FALSE] #Eliminate International Transload-Direct from choice set if Shipment Size < 1 FTL
   
-  dfsp[!(iSCTG %in% c(16:19)) & (path %in% c(55:57)), avail:=FALSE]
+  dfsp[!(Commodity_SCTG %in% c(16:19)) & (path %in% c(55:57)), avail:=FALSE]
+  
+  dfsp[avail==TRUE,minc:=calcLogisticsCost(.SD[,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,unique(path)),by=path] # Faster implementation of above code
 
   dfsp <- dfsp[avail==TRUE & !is.na(minc)]		## limit to only viable choices before finding minimum path
+  
+  # Convert the logistics costs to a probability, adjust using constants
+  # iter <- 1 # just once through if in application
+    # Add the constant to the mode choice table
+  if(!is.null(modeChoiceConstants)){
+    dfsp[modeChoiceConstants,Constant:=i.Constant, on=c("Commodity_SCTG","ODSegment","path")]
+  } else {
+    dfsp[,Constant:=0]
+  }
+    
+    # Calculate Probability
+  dfsp[, Prob:= exp(as.vector(scale(minc)) + Constant) / sum(exp(as.vector(scale(minc)) + Constant)), by = .(BuyerID, SellerID)]
+    
+    #
+  dfsp[,MinCost:=0L]
+  dfsp[dfsp[,.I[which.max(Prob)],by=list(SellerID,BuyerID)][,V1],MinCost:=1]
+      # dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],MinCost:=1]
+      # dfsp <- dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],]
+  
+  dfsp <- dfsp[MinCost==1]
 
-  dfsp <- dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],]
-
-  dfsp <- dfsp[,list(SellerID,BuyerID,NAICS,Commodity_SCTG,time,path,minc,weight)]
+  # dfsp <- dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],]
+  # 
+  # dfsp <- dfsp[,list(SellerID,BuyerID,NAICS,Commodity_SCTG,time,path,minc,weight)]
 
 
 
@@ -423,10 +452,12 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, recycle_check_fil
 
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [return stand-alone data.table]
 
-minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
+minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycle_check_file_path){
+  
+  
 
   pass <- 0			### counter for number of passes through function
-
+  
   for (iSCTG in unique(df$Commodity_SCTG)){
 
     # print(paste(Sys.time(), "iSCTG: ",iSCTG))
@@ -444,24 +475,28 @@ minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
 		###df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG,c("MinGmnql","MinPath","Attribute2_ShipTime"):=minLogisticsCostSctgPaths(df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG],iSCTG,c(3,13,31,46), naics, recycle_check_file_path)]
 
 		### Heither, 02-05-2016: send subset of data to function - Direct (Limited to US Domestic) and anything within CMAP region
+	  
 
-		df1 <- df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG]
-
-		df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(3,13,31,46), naics, recycle_check_file_path)
-
-		if(nrow(df2)>0) {if(pass==0) {
-
-			df_out <- copy(df2)			### make an actual copy, not just a reference to df2
-
-			pass <- pass + 1
-
-			} else {
-
-			df_out <- rbind(df_out,df2)
-
-			}
-
-		}
+	  df1 <- df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG]
+	  if(!is.null(modeChoiceConstants)){
+	    df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(3,13,31,46), naics, modeChoiceConstants = modeChoiceConstants, recycle_check_file_path)
+	  } else {
+	    df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(3,13,31,46), naics, modeChoiceConstants=NULL, recycle_check_file_path)
+	  }
+	  
+	  if(nrow(df2)>0) {if(pass==0) {
+	    
+	    df_out <- copy(df2)			### make an actual copy, not just a reference to df2
+	    
+	    pass <- pass + 1
+	    
+	  } else {
+	    
+	    df_out <- rbind(df_out,df2)
+	    
+	  }
+	    
+	  }
 
 
 
@@ -472,8 +507,12 @@ minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
 		### Heither, 02-05-2016: send subset of data to function - Indirect and International
 
 		df1 <- df[distchannel>1 & (Production_zone>150 | Consumption_zone>150) & Commodity_SCTG==iSCTG]
-
-		df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,47:54,55:57),naics, recycle_check_file_path)
+		
+		if(!is.null(modeChoiceConstants)){
+		  df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,47:54,55:57),naics, modeChoiceConstants=modeChoiceConstants, recycle_check_file_path)
+		} else {
+		  df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,47:54,55:57),naics, modeChoiceConstants=NULL, recycle_check_file_path)
+		}
 
 		if(nrow(df2)>0) {if(pass==0) {
 
@@ -512,7 +551,7 @@ minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
 		}
 
 	}
-
+  
    }
 
 	##### Heither, 02-05-2016: Following line for debugging only
@@ -523,6 +562,34 @@ minLogisticsCost <- function(df,runmode, naics, recycle_check_file_path){
 
 }
 
+## ---------------------------------------------------------------
+######################
+### Edition with 1 group per NAICS group
+#####################
+# create_pmg_sample_groups <- function(naics,groups,sprod){
+#   # sort by sizes
+# 
+#   setkey(consc, Size)
+# 
+#   setkey(prodc, Size)
+# 
+#   prodconsratio <- sum(prodc$OutputCapacityTons)/sum(consc$PurchaseAmountTons)
+# 
+#   if(prodconsratio < 1.1){ #TODO need to move this to variables
+# 
+#     #reduce consumption to ratio is >=1.1
+# 
+#     suppressWarnings(consc[,PurchaseAmountTons:=PurchaseAmountTons/1.1*prodconsratio])
+# 
+#   }
+# 
+# 
+#   #merge together to create all of the pairs of firms for this group and commodity
+# 
+# 
+#   set.seed(151)
+#   suppressWarnings(consc[,group:=1:groups])
+# }
 
 ######################
 ### Edition with multiple groups per NAICS group
@@ -599,6 +666,7 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
 
 }
 
+
 pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibration = NULL){
   # Update progress log
   
@@ -663,7 +731,7 @@ pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibratio
 
     if(!is.null(calibration)){
 
-      pcFlows[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchannel_food, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_food_weight, path = file.path(model$inputdir,"model_distchannel_food_cal.csv"), iter = 4)]
+      pcFlows[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchannel_food, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_food_weight, path = file.path(model$inputdir,paste0(naics,"_g",g,"_model_distchannel_food_cal.csv")), iter = 4)]
 
     } else {
 
@@ -706,7 +774,7 @@ pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibratio
     # Simulate choice -- with calibration if calibration targets provided
     if(!is.null(calibration)){
 
-      pcFlows[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchannel_mfg, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_mfg_weight, path = file.path(model$inputdir,"model_distchannel_mfg_cal.csv"), iter=4)]
+      pcFlows[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchannel_mfg, cal = distchan_cal, calcats = distchan_calcats, weight = pcFlows_mfg_weight, path = file.path(model$inputdir,paste0(naics,"_g",g,"_model_distchannel_mfg_cal.csv")), iter=4)]
 
     } else {
 
@@ -742,7 +810,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,ite
   if(is.numeric(df$CATEGORY)) df[,CATEGORY:=paste0("x",CATEGORY)] #numeric causes problems with column names
 
   cats <- unique(df$CATEGORY)
-  mod<-data.table(expand.grid.df(mod,data.frame(CATEGORY=cats)))
+  if(!"CATEGORY" %in% names(mod)) mod<-data.table(expand.grid.df(mod,data.frame(CATEGORY=cats)))
   
   # if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
   
@@ -811,7 +879,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,ite
     ##utils <- lapply(cats, function(y) sapply(1:alts, function(x) exp(rowSums(sweep(df[CATEGORY==y,mod[CHID==x & CATEGORY==y,VAR],with=F],2,mod[CHID==x & CATEGORY==y,COEFF],"*")))))
 
     utils <- lapply(cats, function(y) sapply(1:alts, function(x) exp(pmin(rowSums(sweep(df[CATEGORY==y,mod[CHID==x & CATEGORY==y,VAR],with=F],2,mod[CHID==x & CATEGORY==y,COEFF],"*")),600))))
-	  utils <- lapply(1:length(cats),function(x) if(is.null(dim(utils[[x]]))){(utils[[x]]/sum(utils[[x]])) %*% ut} else {(utils[[x]]/rowSums(utils[[x]])) %*% ut})
+    utils <- lapply(1:length(cats),function(x) if(is.null(dim(utils[[x]]))){(utils[[x]]/sum(utils[[x]])) %*% ut} else {(utils[[x]]/rowSums(utils[[x]])) %*% ut})
     utils <- do.call("rbind",utils)
     set.seed(151)
     temprand <- runif(max(df$Fin))
@@ -820,7 +888,9 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,ite
     # for calibration
     if(iter>1) modcoeffs[[length(modcoeffs)+1]] <- mod
   }
-  if(iter > 1) fwrite(modcoeffs[[length(modcoeffs)]], file=path)
+  if(iter > 1) {
+    fwrite(modcoeffs[[length(modcoeffs)]][,weight:=sum(weight)], file=path)
+  }
   return(simchoice)
 
 }
@@ -953,30 +1023,39 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
   sample_data <- function(split_number,fractionOfSupplierperBuyer=1.0,samplingforSeller=FALSE){
     pc_split <- merge(prodcg[availableForSample==TRUE][,availableForSample:=NULL],conscg[n_split==split_number&doSample==TRUE][,c("n_split","doSample"):=NULL],by = c("NAICS","Commodity_SCTG"), allow.cartesian = TRUE,suffixes = c(".supplier",".buyer"))
-    pc_split <- pc_split[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
-    pc_split[,Distance_Bin:=FAF_distance[.(FAFZONE.supplier,FAFZONE.buyer),Distance_Bin]]
-    pc_split[,Proportion:=supplier_selection_distribution[.(Commodity_SCTG,Distance_Bin),Proportion]]
-    pc_split[is.na(Proportion),Proportion:=0.0]
-    pc_split[,Proportion:=Proportion*(OutputCapacityTons/sum(OutputCapacityTons)),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
-    min_proportion <- pc_split[Proportion>0,min(Proportion)]/1000
-    pc_split[,Proportion:=Proportion+min_proportion]
-    resample <- TRUE # Check to see all the sellers can meet the buyers demand.
-    sampleIter <- 1
-    while(resample&sampleIter<6) {
-      sampled_pairs <- pc_split[, .(SellerID = sample(SellerID, min(.N, ceiling(nSupplierPerBuyer*fractionOfSupplierperBuyer)), replace = FALSE, prob = Proportion)), by = .(BuyerID)]
-      setkey(sampled_pairs, BuyerID, SellerID)
-      resample <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,sum(OutputCapacityTons)<unique(PurchaseAmountTons),by=.(BuyerID)][,sum(V1)] > ceiling(0.01*length(pc_split[,unique(BuyerID)])) # Make sure that the buyers demand could be fulfilled.
-      resample  <- resample&!samplingforSeller
-      # pc_split_partial <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")]
-      # resample <- pc_split_partial[,sum(OutputCapacityTons)/.N,by=SellerID][,sum(V1)]<pc_split_partial[,sum(PurchaseAmountTons)/.N,by=BuyerID][,sum(V1)]
-      sampleIter <- sampleIter+1
+    if((pc_split[,.N]>0)){
+      pc_split <- pc_split[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
+      pc_split[,Distance_Bin:=FAF_distance[.(FAFZONE.supplier,FAFZONE.buyer),Distance_Bin]]
+      pc_split[,Proportion:=supplier_selection_distribution[.(Commodity_SCTG,Distance_Bin),Proportion]]
+      pc_split[is.na(Proportion),Proportion:=0.0]
+      pc_split[,Proportion:=Proportion*(OutputCapacityTons/sum(OutputCapacityTons)),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
+      min_proportion <- pc_split[Proportion>0,min(Proportion)]/1000
+      pc_split[,Proportion:=Proportion+min_proportion]
+      resample <- TRUE # Check to see all the sellers can meet the buyers demand.
+      sampleIter <- 1
+      while(resample&sampleIter<6) {
+        buyersWithMultipleSellers <- pc_split[,.N,by=BuyerID]
+        if(buyersWithMultipleSellers[N==1,.N]>0){
+          sampled_pairs <- rbindlist(list(if(pc_split[BuyerID %in% buyersWithMultipleSellers[N>1,BuyerID],length(BuyerID)]>0) pc_split[BuyerID %in% buyersWithMultipleSellers[N>1,BuyerID], .(SellerID = sample(SellerID, min(.N, ceiling(nSupplierPerBuyer*fractionOfSupplierperBuyer)), replace = FALSE, prob = Proportion)), by = .(BuyerID)],pc_split[BuyerID %in% buyersWithMultipleSellers[N==1,BuyerID],.(BuyerID,SellerID)]))
+        } else {
+          sampled_pairs <- pc_split[, .(SellerID = sample(SellerID, min(.N, ceiling(nSupplierPerBuyer*fractionOfSupplierperBuyer)), replace = FALSE, prob = Proportion)), by = .(BuyerID)]
+        }
+        setkey(sampled_pairs, BuyerID, SellerID)
+        resample <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,sum(OutputCapacityTons)<unique(PurchaseAmountTons),by=.(BuyerID)][,sum(V1)] > ceiling(0.01*length(pc_split[,unique(BuyerID)])) # Make sure that the buyers demand could be fulfilled.
+        resample  <- resample&!samplingforSeller
+        # pc_split_partial <- pc_split[sampled_pairs,on=c("BuyerID","SellerID")]
+        # resample <- pc_split_partial[,sum(OutputCapacityTons)/.N,by=SellerID][,sum(V1)]<pc_split_partial[,sum(PurchaseAmountTons)/.N,by=BuyerID][,sum(V1)]
+        sampleIter <- sampleIter+1
+      }
+      # print(paste0("Number of sampling iterations for Sellers: ",sampleIter-1))
+      # print(sprintf("Split Number: %d/%d",split_number,n_splits))
+      # print(sprintf("Number of pc_split rows: %d", pc_split[,.N]))
+      # print(paste0(object.size(pc_split)/(1024**3)," Gb"))
+      # print(paste0(object.size(pc_split[sampled_pairs,on=c("BuyerID","SellerID")])/(1024**3)," Gb"))
+      return(pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,Proportion:=NULL])
+    } else {
+      return(NULL)
     }
-    print(paste0("Number of sampling iterations for Sellers: ",sampleIter-1))
-    # print(sprintf("Split Number: %d/%d",split_number,n_splits))
-    # print(sprintf("Number of pc_split rows: %d", pc_split[,.N]))
-    # print(paste0(object.size(pc_split)/(1024**3)," Gb"))
-    # print(paste0(object.size(pc_split[sampled_pairs,on=c("BuyerID","SellerID")])/(1024**3)," Gb"))
-    return(pc_split[sampled_pairs,on=c("BuyerID","SellerID")][,Proportion:=NULL])
   }
   pc <- rbindlist(lapply(1:n_splits,sample_data))
   resampleBuyers <- TRUE # Check to make sure that all buyers can meet the sellers Capacity.
@@ -986,26 +1065,26 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   resampleBuyers <- (length(sellersMaxedOut)>0)
   prodcg[SellerID %in% sellersMaxedOut,availableForSample:=FALSE]
   conscg[!(BuyerID %in% buyersOfSellers), doSample:=FALSE]
-  sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,sum(V1)]
+  sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,as.numeric(sum(V1))]
   # buyDifference <- pc[BuyerID%in%buyersOfSellers,sum(OutputCapacityTons)-unique(PurchaseAmountTons),by=BuyerID][,sum(V1)]
   print(paste0("Original Number of Combinations: ", pc[,.N]))
   limitBuyersResampling <- 5
-  while(resampleBuyers & (sampleBuyersIter<=limitBuyersResampling) & (prodcg[availableForSample==TRUE,.N]>0)){
+  while(resampleBuyers & (sampleBuyersIter<(limitBuyersResampling+1)) & (prodcg[availableForSample==TRUE,.N]>0)){
     new_pc <- rbindlist(lapply(1:n_splits,sample_data,fractionOfSupplierperBuyer=(limitBuyersResampling/model$scenvars$nSuppliersPerBuyer),samplingforSeller=resampleBuyers))
-    validIndex <- new_pc[pc[,.(BuyerID,SellerID,Commodity_SCTG)],.I[is.na(NAICS)],on=c("BuyerID","SellerID","Commodity_SCTG")]
-    pc <- unique(rbind(pc,new_pc[validIndex]))
+    validIndex <- pc[new_pc[,.(BuyerID,SellerID,Commodity_SCTG)],.I[is.na(NAICS)],on=c("BuyerID","SellerID","Commodity_SCTG")]
+    pc <- rbindlist(list(pc,new_pc[validIndex]))
     rm(new_pc)
     sellersMaxedOut <- pc[,sum(PurchaseAmountTons)>unique(OutputCapacityTons),by=.(SellerID)][V1==TRUE,SellerID]
     buyersOfSellers <- pc[SellerID %in% sellersMaxedOut,unique(BuyerID)]
     # new_buyDifference <- pc[BuyerID%in%buyersOfSellers,sum(OutputCapacityTons)-unique(PurchaseAmountTons),by=BuyerID][,sum(V1)]
-    new_sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,sum(V1)]
+    new_sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,as.numeric(sum(V1))]
     resampleBuyers <- (new_sellDifference < (1.10*sellDifference)) # Increased in the maxed out capacity of the sellers should be at least 10%. 
     prodcg[SellerID %in% sellersMaxedOut,availableForSample:=FALSE]
     conscg[!(BuyerID %in% buyersOfSellers), doSample:=FALSE]
     sampleBuyersIter <- sampleBuyersIter + 1
-    print(paste0("Number of Combinations: ",pc[,.N]))
+    print(paste0("Number of Combinations after ", sampleBuyersIter-1, " iteration: ",pc[,.N]))
   }
-  print(paste0("Number of sampling iterations for Buyers: ", sampleBuyersIter-1))
+  # print(paste0("Number of sampling iterations for Buyers: ", sampleBuyersIter-1))
 
 
 
@@ -1015,101 +1094,13 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #Distribution size model
 
   #buyer/seller attributes
-  if(model$scenvars$ApplicationMode){
-    pc <- pc_sim_distchannel(pc = pc, distchannel_food = distchan_food, distchannel_mfg = distchan_mfg)
-  } else {
+  
+  # Distribution Channel (Calibration) Model
+  if(model$scenvars$distchannelCalibration){
     pc <- pc_sim_distchannel(pc = pc, distchannel_food = distchan_food, distchannel_mfg = distchan_mfg, calibration = TRUE)
+  } else {
+    pc <- pc_sim_distchannel(pc = pc, distchannel_food = distchan_food, distchannel_mfg = distchan_mfg)
   }
-  # pc[, c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind") := 0]
-  # 
-  # pc[Buyer.Size <= 49, emple49 := 1]
-  # 
-  # pc[Buyer.Size >= 50 & Buyer.Size <= 199, emp50t199 := 1]
-  # 
-  # pc[Buyer.Size >= 200, empge200 := 1]
-  # 
-  # 
-  # 
-  # pc[,Seller.NAICS2:=substr(Seller.NAICS,1,2)]
-  # 
-  # pc[Seller.NAICS2 %in% 31:33, mfgind := 1]
-  # 
-  # pc[Seller.NAICS2 %in% 48:49, trwind := 1]
-  # 
-  # pc[Seller.NAICS2 %in% c(42, 48, 49), whind := 1]
-  # 
-  # pc[,Buyer.NAICS2:=substr(Buyer.NAICS,1,2)]
-  # 
-  # pc[Buyer.NAICS2 %in% 31:33, mfgind := 1]
-  # 
-  # pc[Buyer.NAICS2 %in% 48:49, trwind := 1]
-  # 
-  # pc[Buyer.NAICS2 %in% c(42, 48, 49), whind := 1]
-  # 
-  # 
-  # 
-  # pc[, CATEGORY := famesctg[Commodity_SCTG]]
-  # 
-  # 
-  # 
-  # setkey(pc, Production_zone, Consumption_zone)
-  # 
-  # pc <- merge(pc, mesozone_gcd, c("Production_zone", "Consumption_zone")) # append distances
-  # 
-  # setnames(pc, "GCD", "Distance")
-  # 
-  # 
-  # 
-  # print(paste(Sys.time(), "Applying distribution channel model"))
-  # 
-  # #Apply choice model of distribution channel and iteratively adjust the ascs
-  # 
-  # #The model estimated for mfg products was applied to all other SCTG commodities
-  # 
-  # inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
-  # 
-  # if (inNumber > 0) {
-  # 
-  #   setkeyv(pc, c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"]))) #sorted on vars, calibration coefficients, so simulated choice is ordered correctly
-  # 
-  #   pc_food <- pc[Commodity_SCTG %in% c(1:9),c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])),with=F]
-  # 
-  #   df <- pc_food[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_food$VAR[distchan_food$TYPE == "Variable"])))] #unique combinations of model coefficients
-  # 
-  #   df[, eval(unique(distchan_food$VAR[distchan_food$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-  # 
-  #   print(paste(Sys.time(), nrow(df), "unique combinations"))
-  # 
-  #   pc[Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_food, distchan_cal, distchan_calcats, 4)]
-  # 
-  # }
-  # 
-  # print(paste(Sys.time(), "Finished ", inNumber, " for Commodity_SCTG %in% c(1:9)"))
-  # 
-  # outNumber <- nrow(pc[!Commodity_SCTG %in% c(1:9)])
-  # 
-  # if (outNumber > 0) {
-  # 
-  #   setkeyv(pc, c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"]))) #sorted on vars so simulated choice is ordered correctly
-  # 
-  #   pc_mfg <- pc[!Commodity_SCTG %in% c(1:9),c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])),with=F]
-  # 
-  #   df <- pc_mfg[, list(Start = min(.I), Fin = max(.I)), by = eval(c("CATEGORY", unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Variable"])))] #unique combinations of model coefficients
-  # 
-  #   ####do this in the function (seems unecessary here)?
-  # 
-  #   df[, eval(unique(distchan_mfg$VAR[distchan_mfg$TYPE == "Constant"])) := 1] #add 1s for constants to each group in df
-  # 
-  #   print(paste(Sys.time(), nrow(df), "unique combinations"))
-  # 
-  #   pc[!Commodity_SCTG %in% c(1:9), distchannel := predict_logit(df, distchan_mfg, distchan_cal, distchan_calcats, 4)]
-  # 
-  # }
-  # 
-  # rm(df)
-  # 
-  # print(paste(Sys.time(), "Finished ", outNumber, " for !Commodity_SCTG %in% c(1:9)"))
-  # 
 
 
   ### -- Heither, 10-15-2015: Enforce Distribution channel logical consistency -- ###
@@ -1163,21 +1154,61 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   n_splits <- ceiling(npct*nShipSizet*size_per_row/((ram_to_use*(1024**3))/cores_used))
   suppressWarnings(pc[,':='(n_split=1:n_splits,k=1)])
   
-  findMinLogisticsCost <- function(split_number){
+  
+  findMinLogisticsCost <- function(split_number,modeChoiceConstants=NULL){
+    
     pc_split <- pc[n_split==split_number]
     pc_split <- merge(pc_split,ShipSize,by="k",allow.cartesian=TRUE)
     pc_split[,k:=NULL]
     setkey(pc_split, Production_zone, Consumption_zone)
     # print(paste0(object.size(pc_split)/(1024**3)," Gb"))
-    df_fin <- minLogisticsCost(pc_split,0, naics, recycle_check_file_path)
+    if(!is.null(modeChoiceConstants)){
+      df_fin <- minLogisticsCost(pc_split,0, naics, modeChoiceConstants = modeChoiceConstants, recycle_check_file_path)
+    } else {
+      df_fin <- minLogisticsCost(pc_split,0, naics, modeChoiceConstants=NULL, recycle_check_file_path)
+    }
     setnames(df_fin,c("time","path","minc"),c("Attribute2_ShipTime","MinPath","MinGmnql"))
     setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
     setkey(pc_split,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
     return(pc_split[df_fin])
   }
-
-  pc <- rbindlist(lapply(1:n_splits,findMinLogisticsCost))
-  pc[,c("n_split"):=NULL]
+  
+  pc[FAFZONE.buyer==FAFZONE.supplier,ODSegment:="I"]
+  pc[FAFZONE.buyer!=FAFZONE.supplier,ODSegment:="X"]
+  iter <- 1
+  if(model$scenvars$modechoiceCalibration){
+    c_path_mode <- mode_description[,.(path=ModeNumber,Mode.Domestic=Mode)]
+    c_path_mode[Mode.Domestic=="Multiple",Mode.Domestic:="Rail"]
+    faf_modeshare[Mode.Domestic=="Multiple",Mode.Domestic:="Rail"]
+  }
+  if(model$scenvars$modechoiceCalibration){
+    modeChoiceConstants <- data.table(expand.grid.df(data.frame(Commodity_SCTG=pc[,unique(Commodity_SCTG)]),data.frame(ODSegment=c("I","X")), c_path_mode))
+    modeChoiceConstants[,Constant:=0]
+    Targets <- faf_modeshare[SCTG %in% pc[,unique(Commodity_SCTG)],.(Tons=sum(Tons)), by=.(Commodity_SCTG=SCTG,ODSegment=Movement.Type,Mode.Domestic)]
+    Targets[,Target:= Tons/sum(Tons), by= .(Commodity_SCTG,ODSegment)]
+    iter <- 4
+  }
+  
+  for(iters in 1:iter){
+    df_min <- rbindlist(lapply(1:n_splits,findMinLogisticsCost,modeChoiceConstants=modeChoiceConstants))
+    if(model$scenvars$modechoiceCalibration){
+      df_share <- df_min[, .(dfTons = sum(PurchaseAmountTons)),by = .(Commodity_SCTG, ODSegment,path=MinPath)]
+      df_share[c_path_mode, Mode.Domestic:=i.Mode.Domestic, on = "path"]
+      df_share <- df_share[,.(dfTons=sum(dfTons)), by= .(Commodity_SCTG,ODSegment,Mode.Domestic)]
+      df_share <- merge(df_share,Targets,by=c("Commodity_SCTG","ODSegment", "Mode.Domestic"), all=TRUE)
+      df_share[, Mod:= dfTons/sum(dfTons,na.rm=TRUE),by=.(Commodity_SCTG,ODSegment)]
+      df_share[is.na(Mod) | Mod == 0, Mod := 0.00001]
+      df_share[is.na(Target) | Target == 0, Target := 0.00001]
+      df_share[, Adj := log(Target/Mod)]
+      modeChoiceConstants[df_share,Constant:=Constant+i.Adj, on = c("Commodity_SCTG","ODSegment","Mode.Domestic")]
+    }
+  }
+  pc <- df_min
+  gc()
+  if(model$scenvars$modechoiceCalibration){
+    saveRDS(modeChoiceConstants[,':='(NAICS=naics,Group=g)], file=file.path(model$inputdir, paste0(naics,"_g",g,"_","modechoiceconstants.rds")))
+  }
+  pc[,c("n_split","ODSegment"):=NULL]
   ## ---------------------------------------------------------------
 
   ## Heither, revised 02-05-2016: revised so correct modepath is reported
