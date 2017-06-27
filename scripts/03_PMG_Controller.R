@@ -68,7 +68,7 @@ if(model$scenvars$distchannelCalibration){
   filelist <- list.files(model$inputdir,pattern = "\\d+_g\\d+_modechoiceconstants.rds",full.names = TRUE,recursive = FALSE)
   modeChoiceConstants <- rbindlist(lapply(filelist,readRDS))
   saveRDS(modeChoiceConstants,file = file.path(model$inputdir,"allModeChoiceConstants.rds"))
-  modeChoiceConstants <- modeChoiceConstants[,.(Constant=mean(Constant)),by=.(Commodity_SCTG,ODSegment,path,Mode.Domestic,NAICS)]
+  modeChoiceConstants <- modeChoiceConstants[,.(Constant=mean(Constant)),by=.(Commodity_SCTG,ODSegment,Mode.Domestic)]
   saveRDS(modeChoiceConstants,file = file.path(model$inputdir,"ModeChoiceConstants.rds"))
   file.remove(filelist)
 }

@@ -1012,7 +1012,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nconst <- as.numeric(conscg[,.N])
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
-  ram_to_use <- 5 #Gb
+  ram_to_use <- (0.75*model$scenvars$availableRAM) # 75% of available RAM
   n_splits <- ceiling(nconst*nprodt*size_per_row/((ram_to_use*(1024**3))/(cores_used+2)))
   # while (nconst * prodcg[,.N] > cthresh) {
   #   n_splits <- n_splits + 1L
