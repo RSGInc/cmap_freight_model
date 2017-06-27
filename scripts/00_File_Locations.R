@@ -40,6 +40,7 @@ pmg[["inputs"]] <- within(pmg[["inputs"]], {
   ShipSize_food                   <-     "model_shipsize_food.csv"                 #Shipment Size MNL models
   ShipSize_mfg                    <-     "model_shipsize_mfg.csv"                  #Shipment Size MNL models
   ShipSize_cal                    <-     "model_shipsize_calibration.csv" #Shipment Size Distribution
+  ShipSize                        <-     "data_commodity_shipmentsizes.csv" # Shipment weight for each SCTG
   faf_modeshare                   <-     "data_FAF_modeshare.csv"         # FAF mode Distribution
   mode_description                <-     "data_mode_description.csv"      # Mode desciption
 })

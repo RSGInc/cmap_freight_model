@@ -43,7 +43,13 @@ if(model$scenvars$runSensitivityAnalysis&!model$scenvars$runParameters){
   skims <- fread(file.path(model$skimsdir,"data_modepath_skims.csv"))
   # mesozone_gcd <- fread(file.path(model$skimsdir,pmg$inputs$mesozone_gcd))
 }
-if(model$scenvars$ApplicationMode) modeChoiceConstants <- readRDS(file = file.path(model$inputdir,"ModeChoiceConstants.rds"))
+if(model$scenvars$ApplicationMode){
+  if(file.exists(file.path(model$inputdir,"ModeChoiceConstants.rds"))){
+    modeChoiceConstants <- readRDS(file = file.path(model$inputdir,"ModeChoiceConstants.rds")) 
+  } else {
+    modeChoiceConstants <- data.table(expand.grid(Commodity_SCTG=c(1:41,43,99),ODSegment=c("I","X"),Mode.Domestic=c("Truck","Rail","Water","Air","Pipeline"),Constant=0))
+  }
+}
 
 
 
@@ -76,7 +82,8 @@ mesozone_gcd[,c("Production_lon", "Production_lat", "Consumption_lon", "Consumpt
 
 #Shipment size model: create tabke of sizes
 
-ShipSize <- data.table(Ship_size = 1:4, weight = c(1000L, 10000L, 30000L, 150000L), k = 1)
+# ShipSize <- data.table(Ship_size = 1:4, weight = c(1000L, 10000L, 30000L, 150000L), k = 1)
+ShipSize <- ShipSize[,.(Ship_size=1:.N,weight=meanWeight,k=1),by=.(Commodity_SCTG=SCTG)]
 
  
 
@@ -1150,7 +1157,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   
   size_per_row <- 12010 #bytes
   npct <- as.numeric(pc[,.N])
-  nShipSizet <- as.numeric(ShipSize[,.N])
+  nShipSizet <- as.numeric(ShipSize[Commodity_SCTG %in% pc[,unique(Commodity_SCTG)],.N])
   n_splits <- ceiling(npct*nShipSizet*size_per_row/((ram_to_use*(1024**3))/cores_used))
   suppressWarnings(pc[,':='(n_split=1:n_splits,k=1)])
   
@@ -1158,7 +1165,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   findMinLogisticsCost <- function(split_number,modeChoiceConstants=NULL){
     
     pc_split <- pc[n_split==split_number]
-    pc_split <- merge(pc_split,ShipSize,by="k",allow.cartesian=TRUE)
+    pc_split <- merge(pc_split,ShipSize,by=c("Commodity_SCTG","k"),allow.cartesian=TRUE,all.x=TRUE)
     pc_split[,k:=NULL]
     setkey(pc_split, Production_zone, Consumption_zone)
     # print(paste0(object.size(pc_split)/(1024**3)," Gb"))
