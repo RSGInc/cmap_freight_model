@@ -70,7 +70,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
   pairs[, Quantity.Traded := as.character(Quantity.Traded)]
   pairs[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
   #Temporary addition. Think of a permanent fix
-  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "Seller.Size", "Buyer.Size", "Buyer.NAICS","Seller.NAICS","Buyer.NAICS2","Seller.NAICS2","CATEGORY","FAFZONE.buyer","FAFZONE.supplier") := NULL]
+  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "Seller.Size", "Buyer.Size","Buyer.NAICS2","Seller.NAICS2","CATEGORY","FAFZONE.buyer","FAFZONE.supplier") := NULL]
   naicspairs[[naics_run_number]] <- pairs
 } #end for (naics_run_number in 1:nrow(naics_set))
 
@@ -131,9 +131,9 @@ sctgCat <- sctgCat[, list(Commodity_SCTG, Category)]
 setkey(sctgCat, Commodity_SCTG)
 setkey(pair2, Commodity_SCTG)
 pair2 <- sctgCat[pair2]
-#pair2[, Port_mesozone:=ifelse(substr(Category,1,4)=="Bulk", Port_mesozoneB, Port_mesozoneNB)]
-#pair2[, Port_name:=ifelse(substr(Category,1,4)=="Bulk", as.character(Port_NameB), as.character(Port_NameNB))]
-#pair2[,c("Port_mesozoneB","Port_mesozoneNB","Port_NameB","Port_NameNB"):=NULL]
+pair2[, Port_mesozone:=ifelse(substr(Category,1,4)=="Bulk", Port_mesozoneB, Port_mesozoneNB)]
+pair2[, Port_name:=ifelse(substr(Category,1,4)=="Bulk", as.character(Port_NameB), as.character(Port_NameNB))]
+pair2[,c("Port_mesozoneB","Port_mesozoneNB","Port_NameB","Port_NameNB"):=NULL]
 
 ## -- Imports
 pair2[Production_zone > 273 &

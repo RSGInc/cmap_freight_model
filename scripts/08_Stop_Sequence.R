@@ -175,8 +175,8 @@ stopseq$summaryfunc <- function(steplist){
   labels_ss <- c("<999 lbs","1k-10k lbs","> 10k lbs")
   labels_nt <- paste("All stops in",c("1 tour","2 tours","3 tours","4 tours"))
   
-  shipsizebynumtours <- shipments[!is.na(ship_size),.N,by=list(ship_size,NTours)]
-  shipsizebynumtours[,ss_lab:=labels_ss[ship_size]]
+  shipsizebynumtours <- shipments[!is.na(Ship_size),.N,by=list(Ship_size,NTours)]
+  shipsizebynumtours[,ss_lab:=labels_ss[Ship_size]]
   shipsizebynumtours[,Tour_Category:=labels_nt[NTours]]
   
   stopseqlist <- list()

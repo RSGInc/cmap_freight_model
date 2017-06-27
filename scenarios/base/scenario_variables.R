@@ -30,7 +30,7 @@ outputprofile     <- FALSE #profiling (set to FALSE for production)
 #---------------------------------------------------------------------
 
 provalthreshold       <- 0.8     # threshold for percentage of purchase value for each commodity group met by producers
-combinationthreshold  <- 3500000 # max number of combinations of producers and consumers to enter into a procurement market game
+combinationthreshold  <- 7000000 # max number of combinations of producers and consumers to enter into a procurement market game
 consprodratiolimit    <- 1000000     # limit on ratio of consumers to producers to enter into the procurement market game
 foreignprodcostfactor <- 0.9     # producer cost factor for foreign produers (applied to unit costs)
 wholesalecostfactor    <- 1.2     # markup factor for wholesalers (applied to unit costs)
@@ -102,10 +102,10 @@ distance_bins <- seq(0,150000,100)
 #---------------------------------------------------------------------
 
 # max number of R script instances to run at once for determining Supplier to Buyer costs (1 for monitoring if that is run)
-maxcostrscripts <- min(8, max(1, future::availableCores()-1))
+maxcostrscripts <- min(16, max(1, future::availableCores()-1))
 
 # max number of R script instances to run at once (1 for monitoring if that is run, the rest for running PMGs)
-maxrscriptinstances <- 16+1
+maxrscriptinstances <- 16
 #maxrscriptinstances <- maxcostrscripts
 
 # Max allocation of memory to each future instance
@@ -224,4 +224,4 @@ runParameters <- FALSE
 #--------------------------------------------------------------------
 ApplicationMode <- TRUE
 distchannelCalibration <- FALSE & (!ApplicationMode)
-modechoiceCalibration <- TRUE & (!ApplicationMode) & (!distchannelCalibration)
+modechoiceCalibration <- FALSE & (!ApplicationMode) & (!distchannelCalibration)
