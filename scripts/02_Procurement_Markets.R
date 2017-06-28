@@ -45,9 +45,7 @@ if(model$scenvars$runSensitivityAnalysis&!model$scenvars$runParameters){
 }
 if(model$scenvars$ApplicationMode){
   if(file.exists(file.path(model$inputdir,"ModeChoiceConstants.rds"))){
-    modeChoiceConstants <- readRDS(file = file.path(model$inputdir,"ModeChoiceConstants.rds")) 
-  } else {
-    modeChoiceConstants <- data.table(expand.grid(Commodity_SCTG=c(1:41,43,99),ODSegment=c("I","X"),Mode.Domestic=c("Truck","Rail","Water","Air","Pipeline"),Constant=0))
+    modeChoiceConstants <- readRDS(file = file.path(model$inputdir,"ModeChoiceConstants.rds"))
   }
 }
 
@@ -85,7 +83,7 @@ mesozone_gcd[,c("Production_lon", "Production_lat", "Consumption_lon", "Consumpt
 # ShipSize <- data.table(Ship_size = 1:4, weight = c(1000L, 10000L, 30000L, 150000L), k = 1)
 ShipSize <- ShipSize[,.(Ship_size=1:.N,weight=meanWeight,k=1),by=.(Commodity_SCTG=SCTG)]
 
- 
+
 
 ## ---------------------------------------------------------------
 
@@ -270,11 +268,11 @@ calcLogisticsCost <- function(dfspi,s,path){
 
   #Calculate annual transport & logistics cost
 
-  
+
 
   # NEW EQUATION
 
-  
+
 
   dfspi[,minc:= B0 * runif(length(pounds)) + #changed scale of B0 -- too large for small shipment flows
 
@@ -284,33 +282,33 @@ calcLogisticsCost <- function(dfspi,s,path){
 
           B2*j*value +
 
-          B3*time/24*value/365 + 
+          B3*time/24*value/365 +
 
           (B4 + B5*value/(pounds/2000))*weight/(2*2000) +
 
           (B5*(value/(pounds/2000))*a)*sqrt((LT_OrderTime+time/24)*((sdQ*pounds/2000)^2) + (pounds/2000)^2*(sdLT*LT_OrderTime)^2)]
 
-  
+
 
   # OLD EQUATION
 
-  
+
 
   # dfspi[,minc:= B0/1000 * runif(length(pounds)) + #changed scale of B0 -- too large for small shipment flows
 
-  #         B1*pounds/weight + 
+  #         B1*pounds/weight +
 
   #         ls*(pounds/2000)*cost + #since cost is per ton
 
   #         B2*j*value +
 
-  #         B3*time/24*j*value/365 + 
+  #         B3*time/24*j*value/365 +
 
   #         (B4 + B5*value/(pounds/2000))*weight/(2*2000) +
 
   #         a*sqrt((LT_OrderTime+time/24)*((sdQ*pounds/2000)^2) + (pounds/2000)^2*(sdLT*LT_OrderTime)^2)]
 
-		  
+
 
   return(dfspi$minc)
 
@@ -331,9 +329,8 @@ calcLogisticsCost <- function(dfspi,s,path){
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [keep NAICS/Commodity_SCTG, return as stand-alone data.table]
 
 minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstants=NULL, recycle_check_file_path){
-  
-  
-  
+
+
 
   callIdentifier <- paste0("minLogisticsCostSctgPaths(iSCTG=",iSCTG, ", paths=", paste0(collapse=", ", paths), " naics=", naics, ")")
 
@@ -361,19 +358,19 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
   }
 
   dfsp <- rbindlist(lapply(paths,transform_merge_data)) # Saves memory with a little compromise on time
-  
+
   #################
   # Group approach
   ################
   # dfsp <- cbind(melt(dfsp[,c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd",paste0("time",paths)),with=F], measure.vars=paste0("time",paths), variable.name="timepath", value.name="time"),
-  # 
+  #
   #               melt(dfsp[,paste0("cost",paths),with=F], measure.vars=paste0("cost",paths), variable.name="costpath", value.name="cost"))
   # suppressWarnings(dfsp[,path:=as.numeric(rep(paths,each=numrows))])
   # print(paste0("Paths: ",paste0(paths,collapse = ",")))
   # print(paste0("Full: ", object.size(dfsp)/(1024**3)," Gb"))
   # dfsp <- dfsp[!(is.na(time)&is.na(cost))]
   # print(paste0("Partial: ", object.size(dfsp)/(1024**3)," Gb"))
-  
+
 
   ## variables from model$scenvars
 
@@ -400,13 +397,13 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
   dfsp[path %in% 51:52 & weight<(0.75*CAP1FTL),avail:=FALSE] #Eliminate Container-Direct from choice set if Shipment Size < 1 40' Container
 
   dfsp[path %in% 53:54 & weight<CAP1FTL,avail:=FALSE] #Eliminate International Transload-Direct from choice set if Shipment Size < 1 FTL
-  
+
   dfsp[!(Commodity_SCTG %in% c(16:19)) & (path %in% c(55:57)), avail:=FALSE]
-  
+
   dfsp[avail==TRUE,minc:=calcLogisticsCost(.SD[,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,unique(path)),by=path] # Faster implementation of above code
 
   dfsp <- dfsp[avail==TRUE & !is.na(minc)]		## limit to only viable choices before finding minimum path
-  
+
   # Convert the logistics costs to a probability, adjust using constants
   # iter <- 1 # just once through if in application
     # Add the constant to the mode choice table
@@ -415,20 +412,20 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
   } else {
     dfsp[,Constant:=0]
   }
-    
+
     # Calculate Probability
   dfsp[, Prob:= exp(as.vector(scale(minc)) + Constant) / sum(exp(as.vector(scale(minc)) + Constant)), by = .(BuyerID, SellerID)]
-    
+
     #
   dfsp[,MinCost:=0L]
   dfsp[dfsp[,.I[which.max(Prob)],by=list(SellerID,BuyerID)][,V1],MinCost:=1]
       # dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],MinCost:=1]
       # dfsp <- dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],]
-  
+
   dfsp <- dfsp[MinCost==1]
 
   # dfsp <- dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],]
-  # 
+  #
   # dfsp <- dfsp[,list(SellerID,BuyerID,NAICS,Commodity_SCTG,time,path,minc,weight)]
 
 
@@ -460,11 +457,11 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 ## Heither, revised 02-05-2016: revised so correct modepath is reported for Supplier-Buyer pair [return stand-alone data.table]
 
 minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycle_check_file_path){
-  
-  
+
+
 
   pass <- 0			### counter for number of passes through function
-  
+
   for (iSCTG in unique(df$Commodity_SCTG)){
 
     # print(paste(Sys.time(), "iSCTG: ",iSCTG))
@@ -482,7 +479,7 @@ minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycl
 		###df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG,c("MinGmnql","MinPath","Attribute2_ShipTime"):=minLogisticsCostSctgPaths(df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG],iSCTG,c(3,13,31,46), naics, recycle_check_file_path)]
 
 		### Heither, 02-05-2016: send subset of data to function - Direct (Limited to US Domestic) and anything within CMAP region
-	  
+
 
 	  df1 <- df[(distchannel==1 |(Production_zone<151 & Consumption_zone<151)) & Commodity_SCTG==iSCTG]
 	  if(!is.null(modeChoiceConstants)){
@@ -490,19 +487,19 @@ minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycl
 	  } else {
 	    df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(3,13,31,46), naics, modeChoiceConstants=NULL, recycle_check_file_path)
 	  }
-	  
+
 	  if(nrow(df2)>0) {if(pass==0) {
-	    
+
 	    df_out <- copy(df2)			### make an actual copy, not just a reference to df2
-	    
+
 	    pass <- pass + 1
-	    
+
 	  } else {
-	    
+
 	    df_out <- rbind(df_out,df2)
-	    
+
 	  }
-	    
+
 	  }
 
 
@@ -514,7 +511,7 @@ minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycl
 		### Heither, 02-05-2016: send subset of data to function - Indirect and International
 
 		df1 <- df[distchannel>1 & (Production_zone>150 | Consumption_zone>150) & Commodity_SCTG==iSCTG]
-		
+
 		if(!is.null(modeChoiceConstants)){
 		  df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,47:54,55:57),naics, modeChoiceConstants=modeChoiceConstants, recycle_check_file_path)
 		} else {
@@ -558,7 +555,7 @@ minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycl
 		}
 
 	}
-  
+
    }
 
 	##### Heither, 02-05-2016: Following line for debugging only
@@ -575,25 +572,25 @@ minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycl
 #####################
 # create_pmg_sample_groups <- function(naics,groups,sprod){
 #   # sort by sizes
-# 
+#
 #   setkey(consc, Size)
-# 
+#
 #   setkey(prodc, Size)
-# 
+#
 #   prodconsratio <- sum(prodc$OutputCapacityTons)/sum(consc$PurchaseAmountTons)
-# 
+#
 #   if(prodconsratio < 1.1){ #TODO need to move this to variables
-# 
+#
 #     #reduce consumption to ratio is >=1.1
-# 
+#
 #     suppressWarnings(consc[,PurchaseAmountTons:=PurchaseAmountTons/1.1*prodconsratio])
-# 
+#
 #   }
-# 
-# 
+#
+#
 #   #merge together to create all of the pairs of firms for this group and commodity
-# 
-# 
+#
+#
 #   set.seed(151)
 #   suppressWarnings(consc[,group:=1:groups])
 # }
@@ -676,8 +673,8 @@ create_pmg_sample_groups <- function(naics,groups,sprod){
 
 pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibration = NULL){
   # Update progress log
-  
-  
+
+
   ### Create variables used in the distribution channel model
   # Create a new table so the preceding table isn't modified
   pcFlows <- copy(pc)
@@ -716,7 +713,7 @@ pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibratio
   #Apply choice model of distribution channel and iteratively adjust the ascs
 
   #The model estimated for mfg products was applied to all other SCTG commodities
-  
+
 
   inNumber <- nrow(pc[Commodity_SCTG %in% c(1:9)])
 
@@ -730,7 +727,7 @@ pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibratio
     pcFlows_food <- pcFlows[Commodity_SCTG %in% c(1:9),model_vars_food,with=FALSE]
     pcFlows_food_weight <- pcFlows[Commodity_SCTG %in% 1:9,PurchaseAmountTons]
 
-    df <- pcFlows_food[, list(Start = min(.I), Fin = max(.I)), by = model_vars_food, with=FALSE] #unique combinations of model coefficients
+    df <- pcFlows_food[, list(Start = min(.I), Fin = max(.I)), by = model_vars_food] #unique combinations of model coefficients
 
     df[, (model_ascs_food) := 1] #add 1s for constants to each group in df
 
@@ -807,20 +804,20 @@ pc_sim_distchannel <- function(pc, distchannel_food, distchannel_mfg, calibratio
 
 
 predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,iter=1){
-  
-  
+
+
   #prepare the data items used in the model application and calibration
   alts <- max(mod$CHID)
   ut<-diag(alts)
   ut[upper.tri(ut)] <- 1
-  
+
   if(is.numeric(df$CATEGORY)) df[,CATEGORY:=paste0("x",CATEGORY)] #numeric causes problems with column names
 
   cats <- unique(df$CATEGORY)
   if(!"CATEGORY" %in% names(mod)) mod<-data.table(expand.grid.df(mod,data.frame(CATEGORY=cats)))
-  
+
   # if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
-  
+
   if(iter > 1){
     if(is.numeric(cal$CATEGORY)) cal[,CATEGORY:=paste0("x",CATEGORY)]
     if(!is.null(weight)) weightcats <- data.table(weight,cat=unlist(lapply(cats,function(x) rep(x,max(df$Fin[df$CATEGORY==x])-min(df$Start[df$CATEGORY==x])+1))))
@@ -834,7 +831,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,ite
     #After first iternaton compare results with targets and calculate adjustment
       if(is.null(weight)){ # do count of choices
         sim <- sapply(cats,function(x) tabulate(simchoice[min(df$Start[df$CATEGORY==x]):max(df$Fin[df$CATEGORY==x])],nbins=alts))
-        
+
         sim <- prop.table(sim, margin = 2)
         dimnames(sim) <- list(NULL, cats)
       } else { # do weighted sum of choices
@@ -844,7 +841,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,ite
         sim <- as.matrix(sim[, cats, with = FALSE])
         sim <- as.data.table(prop.table(sim, margin = 2))
       }
-      
+
 
       if(length(unique(calcats$CHOICE))<length(unique(calcats$CHID))) { # the sim choices need to be aggregated to the calibration data
         sim <- cbind(calcats,sim)
@@ -878,7 +875,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,ite
       mod[TYPE=="Constant",COEFF:=COEFF+ascadj]
       mod[,ascadj:=NULL]
     }
-    
+
     #apply the choice model
 
     ### -- Heither, 08-06-2015: the following line was modified to use the pmin function to cap values at 600 before using the exponential function to prevent INF values --##
@@ -891,7 +888,7 @@ predict_logit <- function(df,mod,cal=NULL,calcats=NULL,weight=NULL,path=NULL,ite
     set.seed(151)
     temprand <- runif(max(df$Fin))
     simchoice <- unlist(lapply(1:nrow(df),function(x) 1L + findInterval(temprand[df$Start[x]:df$Fin[x]],utils[x,])))
-    
+
     # for calibration
     if(iter>1) modcoeffs[[length(modcoeffs)+1]] <- mod
   }
@@ -926,7 +923,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
   print(paste(Sys.time(), "Finished writing buy file for ",naics,"group",g))
 
-  
+
   ###########################
   # Group Approach
   ###########################
@@ -964,7 +961,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     prodcg <- prodc[,list(OutputCommodity,NAICS,Commodity_SCTG,SellerID,Size,FAFZONE,Zone,OutputCapacityTons=OutputCapacityTonsG)]
 
   }
-  
+
   ##############################
   # Full apprach
   ##############################
@@ -1019,8 +1016,8 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nconst <- as.numeric(conscg[,.N])
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
-  ram_to_use <- (0.75*model$scenvars$availableRAM) # 75% of available RAM
-  n_splits <- ceiling(nconst*nprodt*size_per_row/((ram_to_use*(1024**3))/(cores_used+2)))
+  ram_to_use <- (0.8*model$scenvars$availableRAM) # 75% of available RAM
+  n_splits <- ceiling(nconst*nprodt*size_per_row/(ram_to_use/(cores_used)))
   # while (nconst * prodcg[,.N] > cthresh) {
   #   n_splits <- n_splits + 1L
   #   nconst <- as.numeric(ceiling(conscg[,.N] / n_splits))
@@ -1085,7 +1082,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     buyersOfSellers <- pc[SellerID %in% sellersMaxedOut,unique(BuyerID)]
     # new_buyDifference <- pc[BuyerID%in%buyersOfSellers,sum(OutputCapacityTons)-unique(PurchaseAmountTons),by=BuyerID][,sum(V1)]
     new_sellDifference <- pc[SellerID%in%sellersMaxedOut,sum(PurchaseAmountTons)-unique(OutputCapacityTons),by=SellerID][,as.numeric(sum(V1))]
-    resampleBuyers <- (new_sellDifference < (1.10*sellDifference)) # Increased in the maxed out capacity of the sellers should be at least 10%. 
+    resampleBuyers <- (new_sellDifference < (1.10*sellDifference)) # Increased in the maxed out capacity of the sellers should be at least 10%.
     prodcg[SellerID %in% sellersMaxedOut,availableForSample:=FALSE]
     conscg[!(BuyerID %in% buyersOfSellers), doSample:=FALSE]
     sampleBuyersIter <- sampleBuyersIter + 1
@@ -1101,7 +1098,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #Distribution size model
 
   #buyer/seller attributes
-  
+
   # Distribution Channel (Calibration) Model
   if(model$scenvars$distchannelCalibration){
     pc <- pc_sim_distchannel(pc = pc, distchannel_food = distchan_food, distchannel_mfg = distchan_mfg, calibration = TRUE)
@@ -1127,10 +1124,10 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   ##########################
   ## This part of code is memory intensive
   ###########################
-  
+
   # pc[, k:= 1 ]
   # pc <- merge(pc, ShipSize, by = "k", allow.cartesian = TRUE)
-  # 
+  #
   # # Clean up fields -- remove temps fields from distrubtion channel model
   # pc[, k:= NULL]
 
@@ -1154,16 +1151,17 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   #Add "MinGmnql","MinPath","Attribute2_ShipTime" to pc using the minLogisticsCost function
 
   ##Rprof("profile1.out")
-  
+
+
   size_per_row <- 12010 #bytes
   npct <- as.numeric(pc[,.N])
   nShipSizet <- as.numeric(ShipSize[Commodity_SCTG %in% pc[,unique(Commodity_SCTG)],.N])
-  n_splits <- ceiling(npct*nShipSizet*size_per_row/((ram_to_use*(1024**3))/cores_used))
+  n_splits <- ceiling(npct*nShipSizet*size_per_row/(ram_to_use/cores_used))
   suppressWarnings(pc[,':='(n_split=1:n_splits,k=1)])
-  
-  
+
+
   findMinLogisticsCost <- function(split_number,modeChoiceConstants=NULL){
-    
+
     pc_split <- pc[n_split==split_number]
     pc_split <- merge(pc_split,ShipSize,by=c("Commodity_SCTG","k"),allow.cartesian=TRUE,all.x=TRUE)
     pc_split[,k:=NULL]
@@ -1179,7 +1177,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     setkey(pc_split,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
     return(pc_split[df_fin])
   }
-  
+
   pc[FAFZONE.buyer==FAFZONE.supplier,ODSegment:="I"]
   pc[FAFZONE.buyer!=FAFZONE.supplier,ODSegment:="X"]
   iter <- 1
@@ -1195,9 +1193,13 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
     Targets[,Target:= Tons/sum(Tons), by= .(Commodity_SCTG,ODSegment)]
     iter <- 4
   }
-  
+
   for(iters in 1:iter){
-    df_min <- rbindlist(lapply(1:n_splits,findMinLogisticsCost,modeChoiceConstants=modeChoiceConstants))
+    if(model$scenvars$modechoiceCalibration){
+      df_min <- rbindlist(lapply(1:n_splits,findMinLogisticsCost,modeChoiceConstants=modeChoiceConstants))
+    } else {
+      df_min <- rbindlist(lapply(1:n_splits,findMinLogisticsCost))
+    }
     if(model$scenvars$modechoiceCalibration){
       df_share <- df_min[, .(dfTons = sum(PurchaseAmountTons)),by = .(Commodity_SCTG, ODSegment,path=MinPath)]
       df_share[c_path_mode, Mode.Domestic:=i.Mode.Domestic, on = "path"]
@@ -1223,11 +1225,11 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   # df_fin <- minLogisticsCost(pc,0, naics, recycle_check_file_path)
 
   # setnames(df_fin,c("time","path","minc"),c("Attribute2_ShipTime","MinPath","MinGmnql"))
-  # 
+  #
   # setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
-  # 
+  #
   # setkey(pc,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
-  # 
+  #
   # pc <- pc[df_fin]
 
   setkey(pc,Production_zone,Consumption_zone)	### return to original sort order
