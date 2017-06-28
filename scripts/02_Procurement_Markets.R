@@ -1031,7 +1031,9 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
       pc_split <- pc_split[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
       pc_split[,Distance_Bin:=FAF_distance[.(FAFZONE.supplier,FAFZONE.buyer),Distance_Bin]]
       pc_split[,Proportion:=supplier_selection_distribution[.(Commodity_SCTG,Distance_Bin),Proportion]]
-      pc_split[is.na(Proportion),Proportion:=0.0]
+      pc_split[,RemainingProp:=1-sum(Proportion,na.rm=TRUE),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
+      pc_split[is.na(Proportion),Proportion:=(RemainingProp/.N),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
+      pc_split[,RemainingProp:=NULL]
       pc_split[,Proportion:=Proportion*(OutputCapacityTons/sum(OutputCapacityTons)),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
       min_proportion <- pc_split[Proportion>0,min(Proportion)]/1000
       pc_split[,Proportion:=Proportion+min_proportion]
