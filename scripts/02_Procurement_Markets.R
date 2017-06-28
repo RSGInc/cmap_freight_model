@@ -347,7 +347,8 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
   # Full approach
   ##################
   transform_merge_data <- function(path){
-    dfsp_data <- cbind(melt(dfsp[,c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd","ODSegment",paste0("time",path)),with=F], measure.vars=paste0("time",path), variable.name="timepath", value.name="time"),
+    commonNames <- intersect(c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd","ODSegment"),colnames(dfsp))
+    dfsp_data <- cbind(melt(dfsp[,c(commonNames,paste0("time",path)),with=F], measure.vars=paste0("time",path), variable.name="timepath", value.name="time"),
 
                   melt(dfsp[,paste0("cost",path),with=F], measure.vars=paste0("cost",path), variable.name="costpath", value.name="cost"))
     # print(paste0("Path: ",path))
@@ -538,7 +539,7 @@ minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycl
 
 		df1 <- df[Commodity_SCTG==iSCTG]
 
-		df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,55:57), naics, recycle_check_file_path)			## include inland water - 03-06-2017
+		df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,55:57), naics,modeChoiceConstants = NULL, recycle_check_file_path)			## include inland water - 03-06-2017
 
 		if(nrow(df2)>0) {if(pass==0) {
 
@@ -1016,7 +1017,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nconst <- as.numeric(conscg[,.N])
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
-  ram_to_use <- (0.8*model$scenvars$availableRAM) # 75% of available RAM
+  ram_to_use <- (model$scenvars$availableRAM) # 75% of available RAM
   n_splits <- ceiling(nconst*nprodt*size_per_row/(ram_to_use/(cores_used)))
   # while (nconst * prodcg[,.N] > cthresh) {
   #   n_splits <- n_splits + 1L
@@ -1163,7 +1164,6 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
 
   findMinLogisticsCost <- function(split_number,modeChoiceConstants=NULL){
-
     pc_split <- pc[n_split==split_number]
     pc_split <- merge(pc_split,ShipSize,by=c("Commodity_SCTG","k"),allow.cartesian=TRUE,all.x=TRUE)
     pc_split[,k:=NULL]

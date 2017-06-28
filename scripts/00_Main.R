@@ -117,7 +117,6 @@ model <- startModel(
     "bit64",
     "reshape",
     "reshape2",
-    "ggplot2",
     "fastcluster"
   ),
   steps = steps,
@@ -165,7 +164,7 @@ if(!model$scenvars$runSensitivityAnalysis) {
   }
   source(model$stepscripts[3]) #PMG Controller (running the PMGs)
   source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
-  
+
   if (isPeterDevelopmentMode) {
     print("NOTICE -- skipping steps 5:11 because in isPeterDevelopmentMode")
   } else {
@@ -173,12 +172,12 @@ if(!model$scenvars$runSensitivityAnalysis) {
       source(model$stepscripts[scriptNumber]) #Truck Touring Model
     }
   }
-  
+
   save(
     list = c("model", model$steps),
     file = file.path(model$outputdir, "modellists.Rdata")
   )
-  
+
   progressManager(
     "Stop",
     model$logs$Step_RunTimes,
@@ -200,7 +199,7 @@ if(!model$scenvars$runSensitivityAnalysis) {
   # }
   # environment(loadInputs2) <- environment(loadInputs)
   # assignInNamespace("loadInputs",loadInputs2,ns = "rFreight")
-  
+
   # Running Sensitivity Analysis
   source(model$stepscripts[1]) #Firm Synthesis
   modeCategories <- fread("./DashBoard/mode_description.csv", stringsAsFactors = FALSE)
@@ -251,15 +250,15 @@ if(!model$scenvars$runSensitivityAnalysis) {
     # run skims here
   }
   # rsgcolordf <- data.frame(red=c(246,0,99,186,117,255,82), green=c(139,111,175,18,190,194,77), blue=c(31,161,94,34,233,14,133), colornames=c("orange","marine","leaf","cherry","sky","sunshine","violet"))
-  # 
+  #
   # rsgcolordf <- rsgcolordf %>% mutate(hexValue=rgb(red,green,blue,maxColorValue=255))
-  # 
+  #
   # makeMoreColors <- colorRampPalette(rsgcolordf$hexValue)
   # modeColors <- data.table(mode=c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None"),colors=makeMoreColors(8),stringsAsFactors = FALSE,key = "mode")
   # modeColors2 <- makeMoreColors(8)
   # names(modeColors2) <- c("Truck","Rail","Water","Air","Multiple","Pipeline","Other","None")
-  # 
+  #
   # allPC %>% ggplot(aes(x=Distance_Bin))+geom_bar(aes(fill=Mode),position = "fill")+theme_bw()+facet_grid(Commodity_SCTG~B0)+scale_fill_manual("Mode",values = makeMoreColors(6))+scale_x_continuous(breaks = seq(0,75,10),labels = label_distance)+xlab("Distance")
-  
+
   # saveRDS(allPC,file = file.path(model$outputdir,"sensitivityrun1.rds"))
 }

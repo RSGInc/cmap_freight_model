@@ -70,7 +70,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
   pairs[, Quantity.Traded := as.character(Quantity.Traded)]
   pairs[, Last.Iteration.Quantity := as.character(Last.Iteration.Quantity)]
   #Temporary addition. Think of a permanent fix
-  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "Seller.Size", "Buyer.Size","Buyer.NAICS2","Seller.NAICS2","CATEGORY","FAFZONE.buyer","FAFZONE.supplier") := NULL]
+  pairs[,c("emple49", "emp50t199", "empge200", "mfgind", "trwind", "whind", "Seller.Size", "Buyer.Size","Buyer.NAICS2","Seller.NAICS2","CATEGORY","FAFZONE.supplier","FAFZONE.buyer") := NULL]
   naicspairs[[naics_run_number]] <- pairs
 } #end for (naics_run_number in 1:nrow(naics_set))
 
@@ -111,8 +111,9 @@ file.create(recycle_check_file_path) #will create or truncate
 loadPackage("plyr")
 pair1 <- pairs[!(MinPath %in% c(51:54))]
 pair2 <- pairs[MinPath %in% c(51:54)]		## international shipping
-load(file.path(model$basedir, "rFreight/data/data_modepath_ports.rda"))
-ports <- as.data.table(data_modepath_ports)
+# load(file.path(model$basedir, "rFreight/data/data_modepath_ports.rda"))
+# ports <- as.data.table(data_modepath_ports)
+ports <- fread(file.path(model$inputdir,"data_modepath_ports.csv"))
 setkey(ports, Production_zone, Consumption_zone)
 setkey(pair2, Production_zone, Consumption_zone)
 pair2 <-
@@ -168,10 +169,9 @@ pair2[Active == 1, Intl_zone := "C"]
 pair2[Active == 1, IntlDone := 1]
 pair2[, c("Active", "Attribute2_ShipTime", "MinPath", "MinGmnql") := NULL]
 setkey(pair2, Production_zone, Consumption_zone)
-
 ### Calculate Domestic Linehaul-to-Port Mode
 df_fin <-
-  minLogisticsCost(pair2, 1, "NAICS_PLACEHOLDER", recycle_check_file_path)
+  minLogisticsCost(pair2, 1, "NAICS_PLACEHOLDER",modeChoiceConstants = NULL, recycle_check_file_path)
 setnames(df_fin,
          c("time", "path", "minc"),
          c("Attribute2_ShipTime", "MinPath", "MinGmnql"))
