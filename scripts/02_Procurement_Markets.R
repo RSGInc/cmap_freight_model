@@ -1017,12 +1017,8 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nconst <- as.numeric(conscg[,.N])
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
-  ram_to_use <- (model$scenvars$availableRAM) # 75% of available RAM
+  ram_to_use <- 0.9*(model$scenvars$availableRAM) # 75% of available RAM
   n_splits <- ceiling(nconst*nprodt*size_per_row/(ram_to_use/(cores_used)))
-  # while (nconst * prodcg[,.N] > cthresh) {
-  #   n_splits <- n_splits + 1L
-  #   nconst <- as.numeric(ceiling(conscg[,.N] / n_splits))
-  # }
   suppressWarnings(conscg[,':=' (n_split=1:n_splits,doSample=TRUE)])
   prodcg[,availableForSample:=TRUE]
 
@@ -1032,7 +1028,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
       pc_split <- pc_split[Production_zone<=273 | Consumption_zone<=273]	### -- Heither, 10-14-2015: potential foreign flows must have one end in U.S. so drop foreign-foreign
       pc_split[,Distance_Bin:=FAF_distance[.(FAFZONE.supplier,FAFZONE.buyer),Distance_Bin]]
       pc_split[,Proportion:=supplier_selection_distribution[.(Commodity_SCTG,Distance_Bin),Proportion]]
-      pc_split[,RemainingProp:=1-sum(Proportion,na.rm=TRUE),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
+      pc_split[,RemainingProp:=max(1e-12,1-sum(Proportion,na.rm=TRUE)),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
       pc_split[is.na(Proportion),Proportion:=(RemainingProp/.N),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
       pc_split[,RemainingProp:=NULL]
       pc_split[,Proportion:=Proportion*(OutputCapacityTons/sum(OutputCapacityTons)),by=.(BuyerID,Commodity_SCTG,Distance_Bin)]
@@ -1276,7 +1272,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
          "weight", "Distance", "Ship_size", "distchannel",
 
-         "lssbd", "MinGmnql", "MinPath") := NULL]
+         "lssbd", "MinGmnql", "MinPath","FAFZONE.supplier","FAFZONE.buyer","Distance_Bin","i.ODSegment","i.Production_zone","i.Consumption_zone","i.PurchaseAmountTons","i.ConVal","i.lssbd","Prob","Constant","MinCost") := NULL]
 
 
 
