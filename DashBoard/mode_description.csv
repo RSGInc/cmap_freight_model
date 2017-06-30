@@ -53,3 +53,6 @@ ModeNumber,Mode,Label,Description,MultipleModes,International
 52,Truck,cLTL40dir,"Cost, LTL-40 Ft. Container (Direct from Port)",Truck,Water
 53,Truck,cFTL53tload,"Cost, FTL-53 with Transload at Port",Truck,Water
 54,Truck,cLTL53tload,"Cost, LTL-53 with Transload at Port",Truck,Water
+55,Pipeline,cPsctg16,"Cost, Pipeline for Crude Petroleum, SCTG 16 only",Truck-Pipeline-Truck,Pipeline
+56,Pipeline,cPsctg1718,"Cost, Pipeline for Petroleum Products, SCTG 17-18 only",Truck-Pipeline-Truck,Pipeline
+57,Pipeline,cPsctg19,"Cost, Pipeline for Coal NEC, SCTG 19 only",Truck-Pipeline-Truck,Pipeline

@@ -1,0 +1,65 @@
+Item,Name,"Number of
+Positions",Form,Columns
+1,Waybill Date (mm/dd/yy),6,N,1–6
+2,Accounting Period (mm/yy),4,N,7–10
+3,Number of Carloads,4,N,11–14
+4,Car Ownership Category Code,1,A,15
+5,AAR Equipment Type Code,4,A/N,16–19
+6,AAR Mechanical Designation,4,A,20–23
+7,STB Car Type,2,N,24–25
+8,TOFC/COFC Service Code,3,A/N,26–28
+9,Number of TOFC/COFC Units,4,N,29–32
+10,Trailer/Container Unit Ownership Code,1,A,33
+11,Trailer/Container Unit Type Code,1,A,34
+12,Hazardous/Bulk Material in Boxcar,1,A,35
+13,Commodity Code (STCC),5,N,36–40
+14,Billed Weight in Tons,7,N,41–47
+15,Actual Weight in Tons,7,N,48–54
+16,Freight Revenue ($),9,N,55–63
+17,Transit Charges ($),9,N,64–72
+18,Miscellaneous Charges ($),9,N,73–81
+19,Inter/Intra State Code,1,N,82
+20,Type of Move,1,N,83
+21,All Rail/Intermodal Code,1,N,84
+22,Type of Move via Water,1,N,85
+23,Transit Code,1,N,86
+24,Substituted Truck for Rail Service,1,N,87
+25,Rebill Code,1,N,88
+26,Estimated Short Line Miles,4,N,89–92
+27,Stratum Identification,1,N,93
+28,Subsample Code,1,N,94
+29,Exact Expansion Factor,5,N,95–99
+30,Theoretical Expansion Factor,3,N,100–102
+31,Number of Interchanges,1,N,103
+32,Origin BEA Area,3,N,104–106
+33,Origin Freight Rate Territory,1,N,107
+34,Interchange State #1,2,A,108–109
+35,Interchange State #2,2,A,110–111
+36,Interchange State #3,2,A,112–113
+37,Interchange State #4,2,A,114–115
+38,Interchange State #5,2,A,116–117
+39,Interchange State #6,2,A,118–119
+40,Interchange State #7,2,A,120–121
+41,Interchange State #8,2,A,122–123
+42,Interchange State #9,2,A,124–125
+43,Termination BEA Area,3,N,126–128
+44,Termination Freight Rate Territory,1,N,129
+45,Waybill Reporting Period Length,1,N,130
+46,Car Capacity,5,N,131–135
+47,Nominal Car Capacity - Expired,3,N,136–138
+48,Tare Weight of Car,4,N,139–142
+49,Outside Length,5,N,143–147
+50,Outside Width,4,N,148–151
+51,Outside Height,4,N,152–155
+52,Extreme Outside Height,4,N,156–159
+53,Type of Wheel Bearings and Brakes,1,A,160
+54,Number of Axles,1,A/N,161
+55,Draft Gear,2,N,162–16
+56,Number of Articulated Units,1,A/N,164
+57,AAR Error Codes,4,N,165–168
+57-A,Blank,46,N,169–214
+58,Routing Error Flag,1,A,215
+59,Expanded Carloads,6,N,216–221
+60,Expanded Tons,9,N,222–230
+61,Expanded Freight Revenue,11,N,231–241
+62,Expanded Trailer/Container Count,6,N,242–247
