@@ -2041,7 +2041,7 @@ Firm Synthesis {data-navmenu="Validation" .tabset .tabset-fade data-orientation=
 ```{r Firm Synthesis Validation Set-up, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 #### Use producers_consumers.Rdata instead of final pairs dataset here
 # load("E:/Projects/Clients/CMAP/cmap_freight_small/scenarios/base/outputs/producers_consumers.Rdata")
-load(params$firmsyn.data.loc)
+# load(params$firmsyn.data.loc)
 
 # Finding each unique BuyerID and SellerID to get a list of unique buyers and
 # sellers, then assuring that the buyers and sellers selected are domestic.
