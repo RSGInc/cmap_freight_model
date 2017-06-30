@@ -9,11 +9,10 @@ output:
     css: "CMAPDashboard.css"
 params:
   model.data.loc: x
-  firmsyn.data.loc : x
 ---
 
 ```{r loadPackages,echo=FALSE, results='hide', warning=FALSE}
-# rmarkdown::render('./Dashboard/CMAPDashboard_Final.Rmd', params = list(model.data.loc = "../Dashboard/pairs100_sample.Rdata", firmsyn.data.loc = "E:/Projects/Clients/CMAP/cmap_freight_small/scenarios/base/outputs/producers_consumers.Rdata"))
+# rmarkdown::render('./Dashboard/CMAPDashboard.Rmd', params = list(model.data.loc = "../scenarios/base/outputs/pairs.Rdata"))
 
 
 loadPackages <- function (packages, lib = NULL, suppressMessages = TRUE, suppressWarnings = FALSE) 
@@ -169,8 +168,8 @@ setkey(modeCategories,ModeNumber)
 # ModelFlows <- get(load("../scenarios/base/outputs/pairs.Rdata"))
 
 invisible(gc())
-# ModelFlows <- get(load(params$model.data.loc))
-ModelFlows <- fread("../Dashboard/pairs100_sample.csv")
+ModelFlows <- get(load(params$model.data.loc))
+# ModelFlows <- fread("../Dashboard/pairs100_sample.csv")
 # ModelFlows <- readRDS("../scenarios/base/outputs/pairs150.rds")
 geoCorrespond[, STATE := factor(STATE)]
 geoCorrespond[, REGION := factor(REGION)]
