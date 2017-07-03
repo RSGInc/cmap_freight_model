@@ -6,7 +6,7 @@
 #Date:              January 28, 2014
 #Author:            Resource Systems Group, Inc.
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
-############################################################################################## 
+##############################################################################################
 
 #-----------------------------------------------------------------------------------
 #Define file paths for inputs, outputs, workspaces and log files
@@ -28,14 +28,14 @@ firmsyn[["inputs"]] <- within(firmsyn[["inputs"]], {
   prefweights                     <-     "data_firm_pref_weights.csv"
   mzemp                           <-     "data_mesozone_emprankings.csv"      #Industry rankings data by mesozone based on employment
 })
-  
+
 ##2 Procurement Markets
 pmg[["inputs"]] <- within(pmg[["inputs"]], {
   sctg                            <-     "corresp_sctg_category.csv"               #correspondence between SCTG and descriptions
   mesozone_gcd                    <-     "data_mesozone_gcd.csv"                   #Mesozone to mesozone gcds
   skims                           <-     "data_modepath_skims.csv"
-  distchan_food                   <-     ifelse(!(model$scenvars$ApplicationMode&file.exists(file.path(model$inputdir,"model_distchannel_food_cal.csv"))),"model_distchannel_food.csv","model_distchannel_food_cal.csv")              #Distribution channel MNL models
-  distchan_mfg                    <-     ifelse(!(model$scenvars$ApplicationMode&file.exists(file.path(model$inputdir,"model_distchannel_mfg_cal.csv"))),"model_distchannel_mfg.csv","model_distchannel_mfg_cal.csv")
+  distchan_food                   <-     ifelse(model$scenvars$distchannelCalibration|(!file.exists(file.path(model$inputdir,"model_distchannel_food_cal.csv"))),"model_distchannel_food.csv","model_distchannel_food_cal.csv")              #Distribution channel MNL models
+  distchan_mfg                    <-     ifelse(model$scenvars$distchannelCalibration|(!file.exists(file.path(model$inputdir,"model_distchannel_mfg_cal.csv"))),"model_distchannel_mfg.csv","model_distchannel_mfg_cal.csv")
   distchan_cal                    <-     "model_distchannel_calibration.csv"
   ShipSize_food                   <-     "model_shipsize_food.csv"                 #Shipment Size MNL models
   ShipSize_mfg                    <-     "model_shipsize_mfg.csv"                  #Shipment Size MNL models
@@ -58,7 +58,7 @@ stopseq[["inputs"]] <- within(stopseq[["inputs"]], {
   mz_centroids                    <-     "data_mesozone_centroids.csv"             #Centroid coordinates of mesozones
   mz_skims                        <-     "data_mesozone_skims.csv"                 #Mesozone to mesozone skims
 })
-  
+
 ##9 Stop Duration Inputs
 stopdur[["inputs"]] <- within(stopdur[["inputs"]], {
   stopduration                    <-     "model_stopduration.csv"                  #Stop duration MNL model
@@ -76,8 +76,8 @@ tourtod[["inputs"]] <- within(tourtod[["inputs"]], {
 ##7 Vehicle Choice and Tour Pattern Outputs
 vehtour[["summary"]] <- within(vehtour[["summary"]], {
   vehtourpatallcommodities                 <-   "vehtourpat_allcommodities.csv"
-  vehtourpatfood                           <-   "vehtourpat_food.csv" 
-  vehtourpatmfg                            <-   "vehtourpat_mfg.csv" 
+  vehtourpatfood                           <-   "vehtourpat_food.csv"
+  vehtourpatmfg                            <-   "vehtourpat_mfg.csv"
 })
 
 ##8 Stop Sequence Outputs
@@ -89,7 +89,7 @@ stopseq[["summary"]] <- within(stopseq[["summary"]], {
 stopdur[["summary"]] <- within(stopdur[["summary"]], {
   stopdurdurationbytourtype                <-   "stopdur_durationbytourtype.csv"
 })
-  
+
 ##10 Time of Day Outputs
 tourtod[["summary"]] <- within(tourtod[["summary"]], {
   todbytourtype                            <-   "tod_todbytourtype.csv"

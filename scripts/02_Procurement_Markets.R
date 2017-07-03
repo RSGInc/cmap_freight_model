@@ -212,6 +212,7 @@ sctg[Category=="Finished goods (FG)",paste0("B0",c(32:45,47:50)) := sctg[Categor
 
 c_path_mode <- mode_description[,.(path=ModeNumber,Mode.Domestic=Mode)]
 c_path_mode[Mode.Domestic=="Multiple",Mode.Domestic:="Rail"]
+modeChoiceConstants <- modeChoiceConstants[c_path_mode,on="Mode.Domestic",allow.cartesian=TRUE]
 
 
 ## ---------------------------------------------------------------
@@ -332,6 +333,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 
 
 
+
   callIdentifier <- paste0("minLogisticsCostSctgPaths(iSCTG=",iSCTG, ", paths=", paste0(collapse=", ", paths), " naics=", naics, ")")
 
   startTime <- Sys.time()
@@ -416,6 +418,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 
     # Calculate Probability
   dfsp[, Prob:= exp(as.vector(scale(minc)) + Constant) / sum(exp(as.vector(scale(minc)) + Constant)), by = .(BuyerID, SellerID)]
+  dfsp[is.nan(Prob),Prob:=1]
 
     #
   dfsp[,MinCost:=0L]
@@ -538,9 +541,11 @@ minLogisticsCost <- function(df,runmode, naics, modeChoiceConstants=NULL, recycl
 		###### Heither, 02-09-2016: Runmode!=0 - use for shipments between domestic zone and domestic port --
 
 		df1 <- df[Commodity_SCTG==iSCTG]
-
-		df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,55:57), naics,modeChoiceConstants = NULL, recycle_check_file_path)			## include inland water - 03-06-2017
-
+		if(is.null(modeChoiceConstants)){
+		  df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,55:57), naics,modeChoiceConstants = NULL, recycle_check_file_path)			## include inland water - 03-06-2017
+		} else {
+		  df2 <- minLogisticsCostSctgPaths(df1,iSCTG,c(1:2,4:12,14:30,32:45,55:57), naics,modeChoiceConstants = modeChoiceConstants, recycle_check_file_path)
+		}
 		if(nrow(df2)>0) {if(pass==0) {
 
 			df_out <- copy(df2)
@@ -1171,9 +1176,10 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
       df_fin <- minLogisticsCost(pc_split,0, naics, modeChoiceConstants=NULL, recycle_check_file_path)
     }
     setnames(df_fin,c("time","path","minc"),c("Attribute2_ShipTime","MinPath","MinGmnql"))
-    setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
-    setkey(pc_split,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
-    return(pc_split[df_fin])
+    # setkey(df_fin,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
+    # setkey(pc_split,SellerID,BuyerID,NAICS,Commodity_SCTG, weight)
+    commonNames <- intersect(colnames(pc_split),colnames(df_fin))
+    return(pc_split[df_fin,on=commonNames])
   }
 
   pc[FAFZONE.buyer==FAFZONE.supplier,ODSegment:="I"]
@@ -1193,7 +1199,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   }
 
   for(iters in 1:iter){
-    if(model$scenvars$modechoiceCalibration){
+    if(model$scenvars$modechoiceCalibration|exists("modeChoiceConstants")){
       df_min <- rbindlist(lapply(1:n_splits,findMinLogisticsCost,modeChoiceConstants=modeChoiceConstants))
     } else {
       df_min <- rbindlist(lapply(1:n_splits,findMinLogisticsCost))
@@ -1215,7 +1221,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   if(model$scenvars$modechoiceCalibration){
     saveRDS(modeChoiceConstants[,':='(NAICS=naics,Group=g)], file=file.path(model$inputdir, paste0(naics,"_g",g,"_","modechoiceconstants.rds")))
   }
-  pc[,c("n_split","ODSegment"):=NULL]
+  pc[,c("n_split","ODSegment","avail","Constant","Prob","MinCost"):=NULL]
   ## ---------------------------------------------------------------
 
   ## Heither, revised 02-05-2016: revised so correct modepath is reported
@@ -1272,7 +1278,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
 
          "weight", "Distance", "Ship_size", "distchannel",
 
-         "lssbd", "MinGmnql", "MinPath","FAFZONE.supplier","FAFZONE.buyer","Distance_Bin","i.ODSegment","i.Production_zone","i.Consumption_zone","i.PurchaseAmountTons","i.ConVal","i.lssbd","Prob","Constant","MinCost") := NULL]
+         "lssbd", "MinGmnql", "MinPath","FAFZONE.supplier","FAFZONE.buyer","Distance_Bin") := NULL]
 
 
 
