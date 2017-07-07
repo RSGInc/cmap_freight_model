@@ -212,7 +212,7 @@ sctg[Category=="Finished goods (FG)",paste0("B0",c(32:45,47:50)) := sctg[Categor
 
 c_path_mode <- mode_description[,.(path=ModeNumber,Mode.Domestic=Mode)]
 c_path_mode[Mode.Domestic=="Multiple",Mode.Domestic:="Rail"]
-modeChoiceConstants <- modeChoiceConstants[c_path_mode,on="Mode.Domestic",allow.cartesian=TRUE]
+if(exists("modeChoiceConstants")) modeChoiceConstants <- modeChoiceConstants[c_path_mode,on="Mode.Domestic",allow.cartesian=TRUE]
 
 
 ## ---------------------------------------------------------------
@@ -342,7 +342,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 
   s <- sctg[iSCTG]
 
-  dfsp <- merge(dfsp,cskims[,c("Production_zone","Consumption_zone",paste0("time",paths),paste0("cost",paths)),with=F])
+  dfsp <- merge(dfsp,cskims[,c("Production_zone","Consumption_zone",paste0("time",paths),paste0("cost",paths)),with=F],by=c("Production_zone","Consumption_zone"))
 
   numrows <- nrow(dfsp)
   #################
@@ -1022,7 +1022,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   nconst <- as.numeric(conscg[,.N])
   nprodt <- as.numeric(prodcg[,.N])
   size_per_row <- 104
-  ram_to_use <- 0.9*(model$scenvars$availableRAM) # 75% of available RAM
+  ram_to_use <- 0.85*(model$scenvars$availableRAM) # Approximately 85% of available RAM
   n_splits <- ceiling(nconst*nprodt*size_per_row/(ram_to_use/(cores_used)))
   suppressWarnings(conscg[,':=' (n_split=1:n_splits,doSample=TRUE)])
   prodcg[,availableForSample:=TRUE]
