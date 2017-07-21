@@ -50,5 +50,6 @@ Correspond,Description1,STCC_2,Description2,SCTG,Description3
 21,Miscellaneous Transported Products,47,Small Packaged Freight Shipments,,
 22,Mixed Freight,41,Miscellaneous Freight Shipments,43,Mixed Freight
 22,Mixed Freight,46,Miscellaneous Mixed Shipments,,
-23,Hazardous Waste and Materials,48,Hazardous Waste,88,Hazardous Waste and Materials (proxy created by SC)
-23,Hazardous Waste and Materials,49,Hazardous Materials,,
+23,Unknown & NEC,48,Hazardous Waste,,
+23,Unknown & NEC,49,Hazardous Materials,,
+23,Unknown & NEC,,,99,Unknown & NEC
