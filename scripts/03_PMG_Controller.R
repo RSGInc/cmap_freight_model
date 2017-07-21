@@ -78,11 +78,11 @@ if(model$scenvars$runSensitivityAnalysis & model$scenvars$runParameters){
   if(!dir.exists(file.path(model$parameterdir,paste0("100_",model$parameterdesign)))){
     dir.create(file.path(model$parameterdir,paste0("100_",model$parameterdesign)))
   }
-  
+
   # Collect all the output before it is deleted
   if(!exists("sensitivity_environment")) sensitivity_environment <- new.env(parent = .GlobalEnv)
   sensitivity_environment$pcbefore <- list()
-  
+
   # Run it for all NAICS group
   for (naics in model$scenvars$pmgnaicstorun) {
     # sensitivity_environment$pcbefore[[match(naics,model$scenvars$pmgnaicstorun)]] <- rbindlist(lapply(1:naics_set$groups[which(naics_set$NAICS==naics)],function(group) get(load(file.path(
@@ -95,7 +95,7 @@ if(model$scenvars$runSensitivityAnalysis & model$scenvars$runParameters){
       model$parameterdir,paste0("100_",model$parameterdesign), paste0(naics,"prePMG.Rdata")))
     rm(pcBefore)
   }
-  
+
   # sensitivity_environment$pcbefore <- rbindlist(sensitivity_environment$pcbefore)
   # sensitivity_environment$pcbefore[, Mode := modeCategories[.(MinPath), Mode]]
   # sensitivity_environment$pcbefore[, ':='(B0 = B0, B1 = B1, B2 = B2_mult, B3 = B3_mult, B4 = B4, B5 = B5_mult, Run = "Pre PMG")]
@@ -110,7 +110,7 @@ if(model$scenvars$runSensitivityAnalysis & model$scenvars$runParameters){
   if(!dir.exists(file.path(model$outputdir,"skimsoutput",basename(model$skimsdir)))){
     dir.create(file.path(model$outputdir,"skimsoutput",basename(model$skimsdir)))
   }
-  sensitivity_environment$pcbefore <- data.table(rbindlist(sensitivity_environment$pcbefore))
+  sensitivity_environment$pcbefore <- rbindlist(sensitivity_environment$pcbefore)
   sensitivity_environment$pcbefore[, Mode := modeCategories[.(MinPath), Mode]]
   sensitivity_environment$pcbefore[, ':='(SkimFile = as.integer(unlist(strsplit(basename(model$skimsdir),"_"))[2]), Run = "Pre PMG")]
 }
@@ -190,7 +190,7 @@ if(model$scenvars$runSensitivityAnalysis & model$scenvars$runParameters){
       file.path(model$outputdir, paste0(naics, ".Rdata")), temp)
     return(temp$pairs)
   }
-  sensitivity_environment$pcafter <- do.call(rbind, lapply(model$scenvars$pmgnaicstorun, returnPairsTableNAICS))
+  sensitivity_environment$pcafter <- rbindlist(lapply(model$scenvars$pmgnaicstorun, returnPairsTableNAICS))
   sensitivity_environment$pcafter[, Mode := modeCategories[.(MinPath), Mode]]
   sensitivity_environment$pcafter[, ':='(SkimFile = as.integer(unlist(strsplit(basename(model$skimsdir),"_"))[2]), Run = "Post PMG")]
   selectColumns <- intersect(colnames(sensitivity_environment$pcbefore),colnames(sensitivity_environment$pcafter))

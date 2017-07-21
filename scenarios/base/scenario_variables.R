@@ -108,8 +108,9 @@ maxcostrscripts <- min(16, max(1, future::availableCores()-1))
 maxrscriptinstances <- min(16, max(1, future::availableCores()-1))
 #maxrscriptinstances <- maxcostrscripts
 
-# Max allocation of memory to each future instance
+
 availableRAM <- 120*(1024**3) # 120 Gb
+# Max allocation of memory to each future instance
 futureMaxSize <- max(15*(1024**3),availableRAM/max(maxcostrscripts,(maxrscriptinstances-1))) # At least 10 Gb per future.
 
 # should monitoring be run?
