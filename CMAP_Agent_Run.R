@@ -7,10 +7,12 @@
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
 ##############################################################################################
 
-#1.Set the base directory (the directory in which the model resides)
+#1. Set the scenario to run -- same as the folder name inside the scenarios directory
+scenario <- "base"
+
+#2. This code identifies the base directory (the directory in which the model resides)
 library(envDocument)
 scriptpath <- envDocument::get_scriptpath()
-#print(paste("envDocument::get_scriptpath():", envDocument::get_scriptpath()))
 
 if (length(scriptpath) < 2) {
   #How to get script directory: http://stackoverflow.com/a/30306616/283973
@@ -18,8 +20,9 @@ if (length(scriptpath) < 2) {
     x)
 
   if (length(scriptDir)  < 2) {
+
     scriptDir <- getwd()
-    #print(paste("getwd():", getwd()))
+
     if (!file.exists("cmap_freight_model.Rproj"))
       stop(
         paste0(
@@ -38,9 +41,6 @@ if (length(scriptpath) < 2) {
 print(paste0("basedir: ", basedir))
 #there is code, such as source statments that assume the working directory is set to base
 setwd(basedir)
-
-#2. Set the scenario to run -- same as the folder name inside the scenarios directory
-scenario <- "base"
 
 #3. Run the model
 source(file.path(basedir, "scripts", "00_Main.R"))
