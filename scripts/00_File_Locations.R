@@ -43,6 +43,7 @@ pmg[["inputs"]] <- within(pmg[["inputs"]], {
   ShipSize                        <-     "data_commodity_shipmentsizes.csv" # Shipment weight for each SCTG
   faf_modeshare                   <-     "data_FAF_modeshare.csv"         # FAF mode Distribution
   mode_description                <-     "data_mode_description.csv"      # Mode desciption
+  mode_availability               <-     "data_modepath_availability.csv" # Modes available by SCTG and ODSegment
 })
 
 ##7 Vehicle Choice and Tour Pattern Inputs

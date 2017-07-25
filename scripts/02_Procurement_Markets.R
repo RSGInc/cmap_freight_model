@@ -214,6 +214,9 @@ c_path_mode <- mode_description[,.(path=ModeNumber,Mode.Domestic=Mode)]
 c_path_mode[Mode.Domestic=="Multiple",Mode.Domestic:="Rail"]
 if(exists("modeChoiceConstants")) modeChoiceConstants <- modeChoiceConstants[c_path_mode,on="Mode.Domestic",allow.cartesian=TRUE]
 
+mode_availability <- melt.data.table(mode_availability,id.vars = c("ODSegment","Commodity_SCTG","Commodity_SCTG_desc_short"),variable.factor = FALSE,value.name = "avail")[,c("path","LinehaulMode"):=tstrsplit(variable,"_")][,variable:=NULL][,path:=as.numeric(path)]
+setkey(mode_availability,ODSegment,Commodity_SCTG,path)
+
 
 ## ---------------------------------------------------------------
 
@@ -385,7 +388,9 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 
 
 
-  dfsp[,avail:=TRUE]
+  # dfsp[,avail:=TRUE]
+  dfsp[mode_availability,avail:=i.avail,on=c("ODSegment","Commodity_SCTG","path")]
+
 
   dfsp[path %in% 1:12 & weight< 0.5 * CAP1Carload,avail:=FALSE] #Eliminate Water and Carload from choice set if Shipment Size < 0.5 * Rail Carload
 
@@ -401,7 +406,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 
   dfsp[path %in% 53:54 & weight<CAP1FTL,avail:=FALSE] #Eliminate International Transload-Direct from choice set if Shipment Size < 1 FTL
 
-  dfsp[!(Commodity_SCTG %in% c(16:19)) & (path %in% c(55:57)), avail:=FALSE]
+  # dfsp[!(Commodity_SCTG %in% c(16:19)) & (path %in% c(55:57)), avail:=FALSE]
 
   dfsp[avail==TRUE,minc:=calcLogisticsCost(.SD[,list(PurchaseAmountTons,weight,ConVal,lssbd,time,cost)],s,unique(path)),by=path] # Faster implementation of above code
 
