@@ -222,4 +222,5 @@ save(pairs, file = file.path(model$outputdir, "pairs.Rdata"))
 
 system(paste("Rscript ./scripts/DashboardRender.R", scenario), wait = FALSE, show.output.on.console = TRUE)
 
+
 pmgout <- progressEnd(pmgout)
