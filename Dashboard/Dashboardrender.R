@@ -1,1 +1,0 @@
-rmarkdown::render('./Dashboard/CMAPDashboard.Rmd', params = list(model.data.loc = '../scenarios/base/outputs/pairs.Rdata'))

@@ -220,6 +220,7 @@ if (nrow(bad1) > 0)  {
 save(pairs, file = file.path(model$outputdir, "pairs.Rdata"))
 #write.csv(pairs,file=file.path(model$outputdir,"pairs.csv"),row.names=FALSE)
 
-system(paste("Rscript ./scripts/DashboardRender.R", scenario), wait = TRUE, show.output.on.console = TRUE)
+system(paste("Rscript ./scripts/DashboardRender.R", scenario), wait = FALSE, show.output.on.console = TRUE)
+
 
 pmgout <- progressEnd(pmgout)
