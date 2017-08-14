@@ -62,15 +62,13 @@ if(model$scenvars$distchannelCalibration){
     saveRDS(food_cal,file=file.path(model$inputdir,"model_distchannel_mfg_cal.rds"))
     food_calreduced <- food_cal[,.(COEFF=weighted.mean(COEFF,weight)),by=.(CATEGORY,CHID,CHDESC,VAR,TYPE)]
     fwrite(food_calreduced,file=file.path(model$inputdir,"model_distchannel_food_cal.csv"))
-    file.remove(filelistfood)
   }
 } else if (model$scenvars$modechoiceCalibration){
-  filelist <- list.files(model$inputdir,pattern = "\\d+_g\\d+_modechoiceconstants.rds",full.names = TRUE,recursive = FALSE)
+  filelist <- list.files(model$inputdir,pattern = "_g\\d+_modechoiceconstants.rds",full.names = TRUE,recursive = FALSE)
   modeChoiceConstants <- rbindlist(lapply(filelist,readRDS))
   saveRDS(modeChoiceConstants,file = file.path(model$inputdir,"allModeChoiceConstants.rds"))
   modeChoiceConstants <- modeChoiceConstants[,.(Constant=mean(Constant)),by=.(Commodity_SCTG,ODSegment,Mode.Domestic)]
   saveRDS(modeChoiceConstants,file = file.path(model$inputdir,"ModeChoiceConstants.rds"))
-  file.remove(filelist)
 }
 
 if(model$scenvars$runSensitivityAnalysis & model$scenvars$runParameters){
