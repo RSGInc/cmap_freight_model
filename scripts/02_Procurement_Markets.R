@@ -435,7 +435,7 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 
   # dfsp <- dfsp[dfsp[,.I[which.min(minc)],by=list(SellerID,BuyerID)][,V1],]
   #
-  # dfsp <- dfsp[,list(SellerID,BuyerID,NAICS,Commodity_SCTG,time,path,minc,weight)]
+  dfsp <- dfsp[,list(SellerID,BuyerID,NAICS,Commodity_SCTG,time,path,minc,weight)]
 
 
 
@@ -1230,7 +1230,7 @@ create_pmg_inputs <- function(naics,g,sprod, recycle_check_file_path){
   if(model$scenvars$modechoiceCalibration){
     saveRDS(modeChoiceConstants[,':='(NAICS=naics,Group=g)], file=file.path(model$inputdir, paste0(naics,"_g",g,"_","modechoiceconstants.rds")))
   }
-  pc[,c("n_split","ODSegment","avail","Constant","Prob","MinCost"):=NULL]
+  pc[,c("n_split","ODSegment"):=NULL]
   ## ---------------------------------------------------------------
 
   ## Heither, revised 02-05-2016: revised so correct modepath is reported

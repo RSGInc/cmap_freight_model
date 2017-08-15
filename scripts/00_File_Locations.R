@@ -34,6 +34,7 @@ pmg[["inputs"]] <- within(pmg[["inputs"]], {
   sctg                            <-     "corresp_sctg_category.csv"               #correspondence between SCTG and descriptions
   mesozone_gcd                    <-     "data_mesozone_gcd.csv"                   #Mesozone to mesozone gcds
   skims                           <-     "data_modepath_skims.csv"
+  # pmgnaicstorun                   <-     "data_naicstorun.csv"                     #NAICS groups to be run through PMG
   distchan_food                   <-     ifelse(model$scenvars$distchannelCalibration|(!file.exists(file.path(model$inputdir,"model_distchannel_food_cal.csv"))),"model_distchannel_food.csv","model_distchannel_food_cal.csv")              #Distribution channel MNL models
   distchan_mfg                    <-     ifelse(model$scenvars$distchannelCalibration|(!file.exists(file.path(model$inputdir,"model_distchannel_mfg_cal.csv"))),"model_distchannel_mfg.csv","model_distchannel_mfg_cal.csv")
   distchan_cal                    <-     "model_distchannel_calibration.csv"
