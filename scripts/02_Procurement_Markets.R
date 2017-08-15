@@ -336,7 +336,6 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
 
 
 
-
   callIdentifier <- paste0("minLogisticsCostSctgPaths(iSCTG=",iSCTG, ", paths=", paste0(collapse=", ", paths), " naics=", naics, ")")
 
   startTime <- Sys.time()
@@ -355,15 +354,18 @@ minLogisticsCostSctgPaths <- function(dfsp,iSCTG,paths, naics, modeChoiceConstan
     commonNames <- intersect(c("Production_zone","Consumption_zone","SellerID","BuyerID","NAICS","Commodity_SCTG","PurchaseAmountTons","weight","ConVal","lssbd","ODSegment"),colnames(dfsp))
     dfsp_data <- cbind(melt(dfsp[,c(commonNames,paste0("time",path)),with=F], measure.vars=paste0("time",path), variable.name="timepath", value.name="time"),
 
-                  melt(dfsp[,paste0("cost",path),with=F], measure.vars=paste0("cost",path), variable.name="costpath", value.name="cost"))
+                       melt(dfsp[,paste0("cost",path),with=F], measure.vars=paste0("cost",path), variable.name="costpath", value.name="cost"))
     # print(paste0("Path: ",path))
     # print(paste0("Full: ", object.size(dfsp_data)/(1024**3)," Gb"))
+    suppressWarnings(dfsp_data[,path:=as.numeric(rep(path,each=numrows))])
     dfsp_data <- dfsp_data[!(is.na(time)&is.na(cost))]
     # print(paste0("Partial: ", object.size(dfsp_data)/(1024**3)," Gb"))
-    suppressWarnings(dfsp_data[,path:=as.numeric(path)])
+    # suppressWarnings(dfsp_data[,path:=as.numeric(path)])
   }
-
-  dfsp <- rbindlist(lapply(paths,transform_merge_data)) # Saves memory with a little compromise on time
+  maxGroup <- 10
+  pathIndex <- seq_along(paths)
+  pathGroups <- split(paths,ceiling(pathIndex/maxGroup))
+  dfsp <- rbindlist(lapply(pathGroups,transform_merge_data)) # Saves memory with a little compromise on time
 
   #################
   # Group approach
