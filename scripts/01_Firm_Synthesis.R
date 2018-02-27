@@ -518,15 +518,15 @@ progressNextStep("Creating producer and consumers lists")
 setkey(consumers,InputCommodity)
 setkey(producers,OutputCommodity)
 
-# for (naics in naics_set$NAICS) {
-#   # Construct data.tables for just the current commodity
-#   consc <- consumers[naics,]
-#   prodc <- producers[naics,]
-#   #write the tables to an R data file
-#   save(consc,prodc, file = file.path(model$outputdir,paste0(naics, ".Rdata")))
-# }
+for (naics in naics_set$NAICS) {
+  # Construct data.tables for just the current commodity
+  consc <- consumers[naics,]
+  prodc <- producers[naics,]
+  #write the tables to an R data file
+  save(consc,prodc, file = file.path(model$outputdir,paste0(naics, ".Rdata")))
+}
 
-# save(consumers, producers, file = file.path(model$outputdir,"producers_consumers.Rdata"))
+save(consumers, producers, file = file.path(model$outputdir,"producers_consumers.Rdata"))
 
 rm(naics, consc, prodc)
 
