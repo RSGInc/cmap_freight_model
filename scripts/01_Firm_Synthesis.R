@@ -2,7 +2,7 @@
 #Title:             CMAP Agent Based Freight Forecasting Code
 #Project:           CMAP Agent-based economics extension to the meso-scale freight model
 #Description:       1_Firmsynthesis.R produces a synthetic population of firms. From those
-#                   firms a sample are used for simulation as producers and consumers                   
+#                   firms a sample are used for simulation as producers and consumers
 #Date:              January 28, 2014
 #Author:            Resource Systems Group, Inc.
 #Copyright:         Copyright 2014 RSG, Inc. - All rights reserved.
@@ -58,7 +58,7 @@ cbp["4247",Commodity_SCTG:=c(16L,17L,18L,19L)[1+findInterval(temprand,c(0.25,0.5
 cbp["4246",Commodity_SCTG:=c(20L,21L,22L,23L)[1+findInterval(temprand,c(0.25,0.50,0.75))]] #Chemical and Allied Products Merchant Wholesalers
 cbp["4242",Commodity_SCTG:=21L] #Drugs and Druggists Sundries Merchant Wholesalers
 cbp["4234",Commodity_SCTG:=24L] #Professional and Commercial Equipment and Supplies Merchant Wholesalers
-cbp["4241",Commodity_SCTG:=c(27L,28L,29L)[1+findInterval(temprand,c(0.33,0.67))]] #Paper and Paper Product Merchant Wholesalers 
+cbp["4241",Commodity_SCTG:=c(27L,28L,29L)[1+findInterval(temprand,c(0.33,0.67))]] #Paper and Paper Product Merchant Wholesalers
 cbp["4243",Commodity_SCTG:=30L] #Apparel, Piece Goods, and Notions Merchant Wholesalers
 cbp["4238",Commodity_SCTG:=34L] #Machinery, Equipment, and Supplies Merchant Wholesalers
 cbp["4251",Commodity_SCTG:=c(35L,38L)[1+findInterval(temprand,c(0.50))]] #Wholesale Electronic Markets and Agents and Brokers
@@ -106,7 +106,7 @@ rm(mzemp,ZeroCand,cbpc)
 cbp[,c("Industry_NAICS6_CBP","n2","n4","est","temprand"):=NULL] #Revome extra fields,
 
 #save warehouse list for use in truck touring model
-#NAICS 481 air, 482 rail, 483 water, 493 warehouse and storage 
+#NAICS 481 air, 482 rail, 483 water, 493 warehouse and storage
 warehouses <- cbp[MESOZONE<150,][substr(Industry_NAICS6_Make,1,3) %in% c(481,482,483,493)]
 save(warehouses,file=file.path(model$outputdir,"warehouses.Rdata"))
 
@@ -118,7 +118,7 @@ progressNextStep("Creating Producers Database")
 # Creation of Producers database
 # All agents that produce some SCTG commodity become potential producers
 # wholesales are dealt with separately below
-producers <- cbp[Commodity_SCTG>0 & substr(Industry_NAICS6_Make,1,2) != "42",] 
+producers <- cbp[Commodity_SCTG>0 & substr(Industry_NAICS6_Make,1,2) != "42",]
 
 # Create a table of production values and employment by NAICS code to calculate production value
 
@@ -181,7 +181,7 @@ iowhl <- fromwhl[,list(ProValWhl=sum(ProValWhl)),by=list(Industry_NAICS6_Make, I
 #remove wholesale records from io table
 io <- io[substr(Industry_NAICS6_Use,1,2) !="42" & substr(Industry_NAICS6_Make,1,2) !="42"]
 
-#replace wholesale records by adding the make-use value back to the io table 
+#replace wholesale records by adding the make-use value back to the io table
 #as if it was direct from producer to consumer and not via whl
 #so that the production amounts and consumption amounts will be correct
 io <- merge(io,iowhl,by=c("Industry_NAICS6_Make", "Industry_NAICS6_Use"),all.x=TRUE)
@@ -189,9 +189,9 @@ io[is.na(ProValWhl),ProValWhl:=0]
 io[,ProVal:=ProVal+ProValWhl]
 io[,ProValWhl:=NULL]
 
-#add the wholesales with the correct capacities in value and tons 
+#add the wholesales with the correct capacities in value and tons
 #to both producer and consumer tables
-wholesalers <- cbp[substr(Industry_NAICS6_Make,1,2) == "42",] 
+wholesalers <- cbp[substr(Industry_NAICS6_Make,1,2) == "42",]
 whlval <- fromwhl[,list(ProVal=sum(ProValWhl)),by=NAICS_whl]
 setnames(whlval,"NAICS_whl","Industry_NAICS6_Make")
 whlval <- merge(whlval,wholesalers[,list(Emp=sum(Emp)), by=Industry_NAICS6_Make],"Industry_NAICS6_Make")
@@ -310,7 +310,7 @@ consumers <- merge(io[,list(Industry_NAICS6_Use,Industry_NAICS6_Make,ValEmp)], c
 setnames(consumers,"Commodity_SCTG","Buyer.SCTG")
 consumers <- merge(c_n6_n6io_sctg[!duplicated(Industry_NAICS6_Make),list(Industry_NAICS6_Make, Commodity_SCTG)], consumers,"Industry_NAICS6_Make") #merge in the first matching SCTG code
 
-#Some Naics6-Make industries (NAICS6_Make) make more than one SCTG. 
+#Some Naics6-Make industries (NAICS6_Make) make more than one SCTG.
 #Account for this by simulating the SCTG commodity supplied by them based on probability thresholds
 mult_n6make <- unique(c_n6_n6io_sctg[Commodity_SCTG>0 & Proportion<1,list(Industry_NAICS6_Make,Commodity_SCTG,Proportion)])
 setkey(consumers,Industry_NAICS6_Make)
@@ -334,7 +334,7 @@ consumers[,ConVal:=ValEmp*Emp]
 # Convert purchase value from $M to POUNDS
 consumers[,UnitCost:=unitcost$UnitCost[match(Commodity_SCTG,unitcost$Commodity_SCTG)]]
 consumers[,ConVal:=ConVal*1000000] # Value was in $M
-consumers[,PurchaseAmountTons:=ConVal / UnitCost] 
+consumers[,PurchaseAmountTons:=ConVal / UnitCost]
 consumers[,c("ValEmp","UnitCost"):= NULL] # Remove extra fields
 
 #Add foreign consumers to the domestic consumption
@@ -351,7 +351,7 @@ for_cons[,ConVal:=ProdVal*PctProVal]
 # Convert purchase value from $M to POUNDS
 for_cons[,UnitCost:=unitcost$UnitCost[match(Commodity_SCTG,unitcost$Commodity_SCTG)]]
 for_cons[,ConVal:=ConVal*1000000] # Value was in $M
-for_cons[,PurchaseAmountTons:=ConVal / UnitCost] 
+for_cons[,PurchaseAmountTons:=ConVal / UnitCost]
 ### -------------------------------------------------------------------------------------
 ## -- Heither, 03-11-2016: enumerate large foreign consumers into multiple firms (threshold reduced)
 for_cons[PurchaseAmountTons<=500000000, est:=1]
@@ -370,6 +370,7 @@ for_cons[,Buyer.SCTG:=0L] #don't know buyer industry
 for_cons[,Emp:=0L] #don't know employment of buying firm
 # for_cons[,c("CBPZONE","FAFZONE","ProdVal","ProVal","PctProVal", "UnitCost"):= NULL] # Remove extra fields
 for_cons[,c("CBPZONE","ProdVal","ProVal","PctProVal", "UnitCost"):= NULL]
+wholesalers[,c("Tons","Value"):=NULL]
 consumers <- rbind(consumers,for_cons,use.names=TRUE)
 
 # Add preference weights
@@ -517,13 +518,13 @@ progressNextStep("Creating producer and consumers lists")
 setkey(consumers,InputCommodity)
 setkey(producers,OutputCommodity)
 
-for (naics in naics_set$NAICS) {
-  # Construct data.tables for just the current commodity
-  consc <- consumers[naics,]
-  prodc <- producers[naics,]
-  #write the tables to an R data file
-  save(consc,prodc, file = file.path(model$outputdir,paste0(naics, ".Rdata")))
-}
+# for (naics in naics_set$NAICS) {
+#   # Construct data.tables for just the current commodity
+#   consc <- consumers[naics,]
+#   prodc <- producers[naics,]
+#   #write the tables to an R data file
+#   save(consc,prodc, file = file.path(model$outputdir,paste0(naics, ".Rdata")))
+# }
 
 # save(consumers, producers, file = file.path(model$outputdir,"producers_consumers.Rdata"))
 
