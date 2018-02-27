@@ -407,7 +407,7 @@ for (naics_run_number in 1:nrow(naics_set)) {
           save(consc, prodc, pairs, file = naicsRDataFile)
           rm(consc, prodc, pairs)
 
-          #delete naic from tracked outputs
+          #delete naics from tracked outputs
           naicsInProcess[[naicsKey]] <<- NULL
 
           write(print(
