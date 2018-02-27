@@ -28,6 +28,8 @@ library(rFreight, lib.loc = "./library/")
 loadPackage("data.table")
 loadPackage("reshape")
 loadPackage("reshape2")
+loadPackage("glpkAPI")
+loadPackage("clpAPI")
 options(datatable.auto.index = FALSE)
 ##async tools
 ##########################################
