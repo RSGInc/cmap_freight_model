@@ -112,10 +112,11 @@ file.create(recycle_check_file_path) #will create or truncate
 ## add code for shipments b/n zone and port (create input file first)
 loadPackage("plyr")
 pair1 <- pairs[!(MinPath %in% c(51:54))]
-pair1[,ODSegment:=NULL]
+# pair1[,ODSegment:=NULL]
 pair2 <- pairs[MinPath %in% c(51:54)]		## international shipping
 # load(file.path(model$basedir, "rFreight/data/data_modepath_ports.rda"))
 # ports <- as.data.table(data_modepath_ports)
+save(pair1,pair2,file = "output_iter10_prefweights.RData")
 rm(pairs)
 gc()
 ports <- fread(file.path(model$inputdir,"data_modepath_ports.csv"))
@@ -183,17 +184,14 @@ if(exists("modeChoiceConstants")){
     minLogisticsCost(pair2, 1, "NAICS_PLACEHOLDER",modeChoiceConstants = NULL, recycle_check_file_path)
 }
 
-df_fin[,c("Constant","avail","Prob","MinCost","ODSegment"):=NULL]
-
 setnames(df_fin,
          c("time", "path", "minc"),
          c("Attribute2_ShipTime", "MinPath", "MinGmnql"))
-setkey(df_fin, Production_zone, Consumption_zone, SellerID, BuyerID, NAICS, Commodity_SCTG)
-setkey(pair2, Production_zone, Consumption_zone, SellerID, BuyerID, NAICS, Commodity_SCTG)
+setkey(df_fin, SellerID, BuyerID, NAICS, Commodity_SCTG)
+setkey(pair2, SellerID, BuyerID, NAICS, Commodity_SCTG)
 pair2 <- pair2[df_fin]
-pair2[,c("ODSegment","weight","cost","i.PurchaseAmountTons","i.ConVal","i.lssbd","i.timepath","i.costpath","Category"):=NULL]
-setnames(pair2,c("i.weight","i.cost"),c("weight","cost"))
-pair2[, Attribute1_UnitCost := MinGmnql / PurchaseAmountTons]
+pair2[,c("ODSegment","weight","Category"):=NULL]
+setnames(pair2,c("i.weight","MinGmnql"),c("weight","cost"))
 pair2[, Attribute2_ShipTime := Attribute2_ShipTime / 24] 			### Convert from hours to days
 rm(df_fin)
 gc()
@@ -219,8 +217,5 @@ if (nrow(bad1) > 0)  {
 #save the pairs table for inspection/analysis
 save(pairs, file = file.path(model$outputdir, "pairs.Rdata"))
 #write.csv(pairs,file=file.path(model$outputdir,"pairs.csv"),row.names=FALSE)
-
-system(paste("Rscript ./scripts/DashboardRender.R", scenario), wait = FALSE, show.output.on.console = TRUE)
-
 
 pmgout <- progressEnd(pmgout)
