@@ -168,8 +168,8 @@ if(!model$scenvars$runSensitivityAnalysis) {
   source(model$stepscripts[3]) #PMG Controller (running the PMGs)
   source(model$stepscripts[4]) #PMG Outputs (creating pairs.Rdata)
 
-  #Dashboard
-  system(paste("Rscript ./scripts/DashboardRender.R", scenario), wait = FALSE, show.output.on.console = TRUE)
+  # #Dashboard
+  # system(paste("Rscript ./scripts/DashboardRender.R", scenario), wait = FALSE, show.output.on.console = TRUE)
 
   if (isPeterDevelopmentMode) {
     print("NOTICE -- skipping steps 5:11 because in isPeterDevelopmentMode")
