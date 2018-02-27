@@ -8,7 +8,7 @@
 ##############################################################################################
 
 #1. Set the scenario to run -- same as the folder name inside the scenarios directory
-scenario <- "base"
+scenario <- "base_test"
 
 #2. This code identifies the base directory (the directory in which the model resides)
 library(envDocument)
